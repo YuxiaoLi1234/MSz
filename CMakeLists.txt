@@ -13,7 +13,7 @@ pkg_search_module(ZSTD IMPORTED_TARGET libzstd)
 add_library(MSz STATIC
     ./include/api/MSz.cpp
     ./include/internal/MSz_CUDA/MSz.cu
-    ./include/internal/MSz_global/MSz_globals.cpp
+    ./include/internal/MSz_Global/MSz_globals.cpp
     ./include/internal/MSz_Serial/MSz_serial.cpp
     ./include/internal/internal.cpp
     ./include/internal/MSz_OMP/MSz_omp.cpp
