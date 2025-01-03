@@ -42,7 +42,7 @@ make
    - Example: sz3
 4. connection_type
    - Description: Connectivity type for the dataset:
-       - 0: 0: Piecewise linear connectivity (e.g., 2D case: connects only up, down, left, right, up-right, and bottom-left).
+       - 0: Piecewise linear connectivity (e.g., 2D case: connects only up, down, left, right, up-right, and bottom-left).
        - 1: Full connectivity (e.g., 2D: also all diagonal connections).
    - Example: 0
 5. preserve_min
@@ -54,7 +54,7 @@ make
 7. preserve_integral_lines
    - Description: Whether to preserve integral lines (0 for no, 1 for yes).
        - DO NOT use this option if:
-           - Both <preserve_min> and <preserve_max> are set to 1.
+           - <preserve_min> or <preserve_max> are set to 0.
            - <neighbor_number> is set to 1.
    - Example: 0
 

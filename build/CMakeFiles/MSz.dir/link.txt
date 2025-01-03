@@ -1,2 +1,0 @@
-/usr/bin/ar qc libMSz.a CMakeFiles/MSz.dir/include/api/MSz.cpp.o CMakeFiles/MSz.dir/include/internal/MSz_CUDA/MSz.cu.o CMakeFiles/MSz.dir/include/internal/MSz_global/MSz_globals.cpp.o CMakeFiles/MSz.dir/include/internal/MSz_Serial/MSz_serial.cpp.o CMakeFiles/MSz.dir/include/internal/internal.cpp.o CMakeFiles/MSz.dir/include/internal/MSz_OMP/MSz_omp.cpp.o
-/usr/bin/ranlib libMSz.a

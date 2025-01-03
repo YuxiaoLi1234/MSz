@@ -1,7 +1,0 @@
-/global/homes/y/yuxiaoli/MSz/build/CMakeFiles/install/strip.dir
-/global/homes/y/yuxiaoli/MSz/build/CMakeFiles/install/local.dir
-/global/homes/y/yuxiaoli/MSz/build/CMakeFiles/install.dir
-/global/homes/y/yuxiaoli/MSz/build/CMakeFiles/list_install_components.dir
-/global/homes/y/yuxiaoli/MSz/build/CMakeFiles/rebuild_cache.dir
-/global/homes/y/yuxiaoli/MSz/build/CMakeFiles/edit_cache.dir
-/global/homes/y/yuxiaoli/MSz/build/CMakeFiles/MSz.dir

@@ -1,0 +1,60 @@
+related_error: 0.0001
+Overall Compression Ratio: 9.5766776716826989
+Original Compression Ratio: 9.5770469822548403
+Overall Bitrate: 6.6829021706809399
+Original Bitrate: 6.6826444642680149
+After Preservation PSNR: 84.768218885794624
+Original PSNR: 84.768218885794624
+edit_ratio: 0
+compression_time: 2.1533974690402191e-317
+additional_time: 2.9643938750474793e-323
+
+
+related_error: 0.001
+Overall Compression Ratio: 26.034974255174166
+Original Compression Ratio: 26.037703893380648
+Overall Bitrate: 2.4582317375359302
+Original Bitrate: 2.4579740311230052
+After Preservation PSNR: 64.754279873497481
+Original PSNR: 64.754279873497481
+edit_ratio: 0
+compression_time: 2.1533974690402191e-317
+additional_time: 2.9643938750474793e-323
+
+
+related_error: 0.001
+Overall Compression Ratio: 26.03539416226155
+Original Compression Ratio: 26.038123888523717
+Overall Bitrate: 2.4581920903954799
+Original Bitrate: 2.4579343839825554
+After Preservation PSNR: 64.754279873497481
+Original PSNR: 64.754279873497481
+edit_ratio: 0
+compression_time: 2.1564567235192681e-317
+additional_time: 2.9643938750474793e-323
+
+
+related_error: 0.001
+Overall Compression Ratio: 26.03539416226155
+Original Compression Ratio: 26.038123888523717
+Overall Bitrate: 2.4581920903954799
+Original Bitrate: 2.4579343839825554
+After Preservation PSNR: 64.754279873497481
+Original PSNR: 64.754279873497481
+edit_ratio: 0
+compression_time: 2.1565594891736031e-317
+additional_time: 2.9643938750474793e-323
+
+
+related_error: 0.001
+Overall Compression Ratio: 26.034974255174166
+Original Compression Ratio: 26.037703893380648
+Overall Bitrate: 2.4582317375359302
+Original Bitrate: 2.4579740311230052
+After Preservation PSNR: 64.754279873497481
+Original PSNR: 64.754279873497481
+edit_ratio: 0
+compression_time: 2.1565594891736031e-317
+additional_time: 2.9643938750474793e-323
+
+
