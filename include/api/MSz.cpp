@@ -1,17 +1,9 @@
-#include "cuda_runtime.h"
-#include "cublas_v2.h"
-#include <cuda_runtime.h>
-#include "device_launch_parameters.h"
 #include "MSz.h"
-#include "../internal/MSz_OMP/MSz_omp.h"
-#include "../internal/MSz_Serial/MSz_serial.h"
-#include "omp.h"
 #include <fstream>
 #include <cstdint>
 #include <sstream>
 #include <vector>
 #include <cstdlib>
-#include <fstream>
 #include <stdatomic.h>
 #include <unordered_map>
 #include <random>
@@ -24,14 +16,28 @@
 #include <algorithm>
 #include <numeric>
 #include <utility>
-#include <fstream>
 #include <iomanip>
 #include <chrono>
 #include <random>
-#include <iostream>
 #include <filesystem>
 #include <cstdio>
 #include <zstd.h>
+
+#ifdef OPENMP_ENABLED
+    #include <omp.h>
+    #include "../internal/MSz_OMP/MSz_omp.h"
+#endif
+
+#ifdef CUDA_ENABLED
+    #include "device_launch_parameters.h"
+    #include "cuda_runtime.h"
+    #include "cublas_v2.h"
+    #include "../internal/MSz_CUDA/MSz.cu"
+#endif
+
+#include "../internal/MSz_Serial/MSz_serial.h"
+#include "../internal/MSz_Global/MSz_globals.cpp"
+
 
 
 extern int fix_process(std::vector<int> *a,std::vector<int> *b,std::vector<int> *c,std::vector<int> *d,std::vector<double> *input_data,std::vector<double> *decompressed_data,std::vector<int>* dec_label1,std::vector<int>* or_label1, int W, int H, int D, double bound, int preserve_min, int preserve_max, int preserve_path, int connectivity_type, int device_id);
@@ -115,52 +121,38 @@ extern "C" {
         
         
         int status = MSZ_ERR_NO_ERROR;
-        if(accelerator == MSZ_ACCELERATOR_CUDA)
-        {
-            status = fix_process(dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_m,dev_q,
-                    W, H, D, 
-                    bound,  
-                    preserve_min, preserve_max, preserve_path, connectivity_type,
-                    device_id);
-        }
 
-        else if(accelerator == MSZ_ACCELERATOR_OMP)
-        {
-            if (num_omp_threads <= 0) {
-                return MSZ_ERR_INVALID_THREAD_COUNT;
-            }
-            omp_set_num_threads(num_omp_threads);
-            status = fix_process_omp(
-                dev_a, dev_b, dev_c, dev_d,
-                dev_e, dev_f,
-                dev_q, dev_m, 
-                W, H, D, 
-                bound,  
-                preserve_min, preserve_max, preserve_path,
-                connectivity_type
-            );
-        }
-
-        else if(accelerator == MSZ_ACCELERATOR_NONE)
-        {
-            int status = fix_process_cpu(
-                dev_a, dev_b, dev_c, dev_d,
-                dev_e, dev_f,
-                dev_q, dev_m, 
-                W, H, D, 
-                bound,  
-                preserve_min, preserve_max, preserve_path,
-                connectivity_type
-            );
-
-        }
-        else
-        {
+        if (accelerator == MSZ_ACCELERATOR_CUDA) {
+            #ifdef CUDA_ENABLED
+                    status = fix_process(dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_m, dev_q,
+                                        W, H, D, bound, preserve_min, preserve_max, preserve_path, connectivity_type,
+                                        device_id);
+            #else
+                    return MSZ_ERR_NOT_IMPLEMENTED;
+            #endif
+        } 
+        else if (accelerator == MSZ_ACCELERATOR_OMP) {
+            #ifdef OPENMP_ENABLED
+                    if (num_omp_threads <= 0) {
+                        return MSZ_ERR_INVALID_THREAD_COUNT;
+                    }
+                    omp_set_num_threads(num_omp_threads);
+                    status = fix_process_omp(dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_q, dev_m,
+                                            W, H, D, bound, preserve_min, preserve_max, preserve_path, connectivity_type);
+            #else
+                    return MSZ_ERR_NOT_IMPLEMENTED;
+            #endif
+        } 
+        else if (accelerator == MSZ_ACCELERATOR_NONE) {
+            status = fix_process_cpu(dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_q, dev_m,
+                                    W, H, D, bound, preserve_min, preserve_max, preserve_path, connectivity_type);
+        } 
+        else {
             return MSZ_ERR_NOT_IMPLEMENTED;
         }
 
         if(status != MSZ_ERR_NO_ERROR) return status;
-        
+            
 
 
         std::vector<uint32_t> indexs;
@@ -251,43 +243,41 @@ extern "C" {
         std::vector<int>* dev_q = &dec_label1;
         std::vector<int>* dev_m = &or_label1;
         
-        if(accelerator == MSZ_ACCELERATOR_CUDA)
-        {
-            int status = count_false_cases(dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_m,dev_q,
-                    W, H, D, connectivity_type,
-                    num_false_min, num_false_max, num_false_labels,
-                    device_id
+        int status = MSZ_ERR_NOT_IMPLEMENTED;
+
+        if (accelerator == MSZ_ACCELERATOR_CUDA) {
+            #ifdef CUDA_ENABLED
+                    status = count_false_cases(
+                        dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_m, dev_q,
+                        W, H, D, connectivity_type,
+                        num_false_min, num_false_max, num_false_labels,
+                        device_id
                     );
-            return status;
-        }
-
-        else if(accelerator == MSZ_ACCELERATOR_OMP)
-        {
-            if (num_omp_threads <= 0) {
-                return MSZ_ERR_INVALID_THREAD_COUNT;
-            }
-
-            omp_set_num_threads(num_omp_threads);
-            int status = count_false_cases_omp(dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_m,dev_q,
-                    W, H, D, connectivity_type,
-                    num_false_min, num_false_max, num_false_labels
+            #else
+                    return MSZ_ERR_NOT_IMPLEMENTED;
+            #endif
+        } else if (accelerator == MSZ_ACCELERATOR_OMP) {
+            #ifdef OPENMP_ENABLED
+                    if (num_omp_threads <= 0) {
+                        return MSZ_ERR_INVALID_THREAD_COUNT;
+                    }
+                    omp_set_num_threads(num_omp_threads);
+                    status = count_false_cases_omp(
+                        dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_m, dev_q,
+                        W, H, D, connectivity_type,
+                        num_false_min, num_false_max, num_false_labels
                     );
-            return status;
+            #else
+                    return MSZ_ERR_NOT_IMPLEMENTED;
+            #endif
+        } else if (accelerator == MSZ_ACCELERATOR_NONE) {
+            status = count_false_cases_cpu(
+                dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_m, dev_q,
+                W, H, D, connectivity_type,
+                num_false_min, num_false_max, num_false_labels
+            );
         }
-
-        else if(accelerator == MSZ_ACCELERATOR_NONE)
-        {
-            int status = count_false_cases_omp(dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_m,dev_q,
-                    W, H, D, connectivity_type,
-                    num_false_min, num_false_max, num_false_labels
-                    );
-            return status;
-        }
-
-        else
-        {
-            return MSZ_ERR_NOT_IMPLEMENTED;
-        }
+        return status;
     }
 
     double MSz_calculate_false_label_ratio(

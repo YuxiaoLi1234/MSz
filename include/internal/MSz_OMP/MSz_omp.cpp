@@ -1,5 +1,5 @@
 #include "MSz_omp.h"
-#include "../MSz_global/MSz_globals.h"
+#include "../MSz_Global/MSz_globals.h"
 #include "../../api/MSz.h"
 #include <parallel/algorithm>  
 #include <omp.h>

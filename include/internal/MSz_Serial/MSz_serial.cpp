@@ -1,4 +1,4 @@
-#include "../MSz_global/MSz_globals.h"
+#include "../MSz_Global/MSz_globals.h"
 #include "../../api/MSz.h"
 #include "MSz_serial.h"
 // g++-12 -fopenmp -std=c++17 -O3 -g MSz_cpu.cpp -o MSz_cpu
