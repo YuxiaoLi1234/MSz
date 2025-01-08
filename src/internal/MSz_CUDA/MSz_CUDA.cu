@@ -1,6 +1,7 @@
 #include <iostream>
 #include <float.h> 
 #include <cublas_v2.h>
+#include <fstream>
 #include <sstream>
 #include "api/MSz.h"
 #include "MSz_CUDA.h"

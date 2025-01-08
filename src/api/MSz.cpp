@@ -13,6 +13,7 @@
 #include <unordered_set>
 #include <set>
 #include <map>
+#include <cstring>
 #include <algorithm>
 #include <numeric>
 #include <utility>
@@ -284,7 +285,6 @@ extern "C" {
             int num_false_labels,
             int W, int H, int D)
     {
-        
         if(W <= 0 || H <= 0 || D <= 0 || num_false_labels < 0) return  MSZ_ERR_INVALID_INPUT;
         return static_cast<double>(num_false_labels) / (W * H * D);
     }

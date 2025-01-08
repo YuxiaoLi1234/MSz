@@ -5,9 +5,8 @@ MSz is designed to preserve topological features such as local minima, maxima, a
 ## Requirements
 - C++17 or later
 - CMake 3.18 or later
-- CUDA
-- OpenMP
-- SZ3, ZFP and ZSTD libraries (if using these compression methods)
+- CUDA (if needed)
+- OpenMP (if needed)
 
 ## Installation
 ### 1. Clone the Repository
@@ -23,12 +22,7 @@ cmake ..
 make
 ```
 
-### 3. Usage
-```bash
-./MSz <path/to/data>,<width>,<height>,<depth> <relative_error_bound> <compressor_type> <connection_type> <preserve_min> <preserve_max> <preserve_integral_lines>
-```
-
-### 4. Parameters
+### 3. Parameters
 1. path/to/data,width,height,depth
    - Description: Path to the input dataset, followed by its dimensions (width, height, depth).
    - Example: path/to/your/data.bin,256,256,128
@@ -58,15 +52,7 @@ make
            - <neighbor_number> is set to 1.
    - Example: 0
 
-### 5. Get the decompressed data with topology preservation
-```bash
-python3 get_fix_decp.py -e path/to/your/compressed/edits -i path/to/your/compressed/index -d path/to/your/compressed/data
-example: python3 get_fix_decp.py -e edits_at.bin.zst -i index_at.bin.zst -d ../compressed_at_sz3_0.105184.sz3
-```
-### 6. Output
-The decompressed data with topology preservation will be stored in the `result` folder. 
 
-Additionally, a detailed report file named `result_<filename>_<compressor>_detailed.txt` will be generated. This file includes evaluation metrics such as Peak Signal-to-Noise Ratio (PSNR) and Compression Ratio (CR).
 
 
 
