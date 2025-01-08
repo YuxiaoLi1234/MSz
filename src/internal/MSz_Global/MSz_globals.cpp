@@ -1,4 +1,4 @@
-#include "../../api/MSz.h"
+#include "api/MSz.h"
 #include "cuda_runtime.h"
 #include "cublas_v2.h"
 #include <cuda_runtime.h>
@@ -28,8 +28,7 @@
 #include <iomanip>
 #include <chrono>
 #include <random>
-#include <iostream>
-#include <filesystem>
+
 
 extern "C"
 {

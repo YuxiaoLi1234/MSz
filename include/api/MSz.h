@@ -369,7 +369,48 @@ extern "C" {
       int &num_edits,                // Output: number of decompressed edits
       MSz_edit_t **edits             // Output: pointer to an array of decompressed edits
   );
-    
+
+
+  /**
+ * @brief API for applying topology-preserving edits to decompressed data.
+ *
+ * This function applies the computed edits to the decompressed data to ensure the preservation 
+ * of topological features (e.g., minima, maxima, separatrices).
+ *
+ * @param decompressed_data Pointer to the decompressed data array.
+ * @param num_edits Number of edits to apply.
+ * @param edits Pointer to the array of edits (`MSz_edit_t`) to be applied.
+ * @param W, H, D Dimensions of the data grid:
+ *        - `W`: Width of the data grid (x-dimension).
+ *        - `H`: Height of the data grid (y-dimension).
+ *        - `D`: Depth of the data grid (z-dimension). For 2D datasets, set `D` to 1.
+ * @param accelerator Hardware accelerator for computation:
+ *        - `MSZ_ACCELERATOR_NONE`: Pure CPU execution.
+ *        - `MSZ_ACCELERATOR_OMP`: OpenMP-based CPU parallelization.
+ *        - `MSZ_ACCELERATOR_CUDA`: CUDA-based GPU acceleration.
+ * @param device_id GPU device ID (used only if `accelerator` is `MSZ_ACCELERATOR_CUDA`).
+ * @param num_omp_threads Number of threads (used only if `accelerator` is `MSZ_ACCELERATOR_OMP`).
+ *
+ * @return Returns `MSZ_ERR_NO_ERROR` if the function executes successfully.
+ *         Possible error codes include:
+ *         - `MSZ_ERR_INVALID_INPUT`: Input parameters are invalid.
+ *         - `MSZ_ERR_OUT_OF_MEMORY`: Memory allocation failed.
+ *         - `MSZ_ERR_UNKNOWN_ERROR`: An unknown error occurred during the application of edits.
+ *
+ * @note 
+ * - Ensure that `decompressed_data` points to a valid memory region with dimensions `W x H x D`.
+ * - Ensure that `edits` is a valid array with `num_edits` elements.
+ */
+  int MSz_apply_edits( // return MSZ_ERR_NO_ERROR if success
+      double *decompressed_data,     // Input/Output: decompressed data to be modified
+      int num_edits,                 // Input: number of edits to apply
+      const MSz_edit_t *edits,       // Input: array of edits
+      int W, int H, int D,           // Input: dimensions of the data
+      int accelerator = MSZ_ACCELERATOR_NONE, // Input: hardware accelerator
+      int device_id = 0,             // Input: GPU device ID (if using CUDA)
+      int num_omp_threads = 1        // Input: number of threads (if using OpenMP)
+  );
+
 }
 
 

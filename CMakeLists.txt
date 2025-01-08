@@ -31,31 +31,37 @@ if (ENABLE_OPENMP)
 endif()
 
 set(SRC_FILES
-    ./include/api/MSz.cpp
-    ./include/internal/MSz_Global/MSz_globals.cpp
-    ./include/internal/MSz_Serial/MSz_serial.cpp
+    ./src/api/MSz.cpp
+    ./src/internal/MSz_Global/MSz_globals.cpp
+    ./src/internal/MSz_Serial/MSz_serial.cpp
 )
 
+
 if (USE_CUDA)
-    list(APPEND SRC_FILES ./include/internal/MSz_CUDA/MSz.cu)
+    list(APPEND SRC_FILES ./src/internal/MSz_CUDA/MSz_CUDA.cu)
 endif()
 
 if (USE_OPENMP)
-    list(APPEND SRC_FILES ./include/internal/MSz_OMP/MSz_omp.cpp)
+    list(APPEND SRC_FILES ./src/internal/MSz_OMP/MSz_omp.cpp)
 endif()
 
 add_library(MSz STATIC ${SRC_FILES})
 
 target_compile_features(MSz PRIVATE cxx_std_17)
 
+target_include_directories(MSz PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(MSz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+
 if (USE_CUDA)
     target_link_libraries(MSz PRIVATE CUDA::cudart)
+    target_compile_definitions(MSz PRIVATE CUDA_ENABLED)
     set_target_properties(MSz PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 endif()
 
 if (USE_OPENMP)
     target_link_libraries(MSz PRIVATE OpenMP::OpenMP_CXX)
-    target_compile_definitions(MSz PRIVATE -DOPENMP_ENABLED)
+    target_compile_definitions(MSz PRIVATE OPENMP_ENABLED)
 endif()
 
 target_link_libraries(MSz PRIVATE PkgConfig::ZSTD zfp::zfp SZ3::SZ3)

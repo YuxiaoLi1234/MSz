@@ -1,4 +1,4 @@
-#include "MSz.h"
+#include "api/MSz.h"
 #include <fstream>
 #include <cstdint>
 #include <sstream>
@@ -19,24 +19,24 @@
 #include <iomanip>
 #include <chrono>
 #include <random>
-#include <filesystem>
+
 #include <cstdio>
 #include <zstd.h>
 
 #ifdef OPENMP_ENABLED
     #include <omp.h>
-    #include "../internal/MSz_OMP/MSz_omp.h"
+    #include "internal/MSz_OMP/MSz_omp.h"
 #endif
 
 #ifdef CUDA_ENABLED
     #include "device_launch_parameters.h"
     #include "cuda_runtime.h"
     #include "cublas_v2.h"
-    #include "../internal/MSz_CUDA/MSz.cu"
+    #include "internal/MSz_CUDA/MSz_CUDA.h"
 #endif
 
-#include "../internal/MSz_Serial/MSz_serial.h"
-#include "../internal/MSz_Global/MSz_globals.cpp"
+#include "internal/MSz_Serial/MSz_serial.h"
+#include "internal/MSz_Global/MSz_globals.h"
 
 
 
@@ -446,6 +446,59 @@ extern "C" {
 
         return MSZ_ERR_NO_ERROR; // Success
     }
+
+    int MSz_apply_edits(
+        double *decompressed_data,
+        int num_edits,
+        const MSz_edit_t *edits,
+        int W, int H, int D,
+        int accelerator,
+        int device_id,
+        int num_omp_threads
+    ) {
+        
+        if (!decompressed_data || !edits || num_edits <= 0 || W <= 0 || H <= 0 || D <= 0) {
+            return MSZ_ERR_INVALID_INPUT;
+        }
+
+        
+        if (accelerator == MSZ_ACCELERATOR_NONE) {
+            
+            for (int i = 0; i < num_edits; ++i) {
+                int index = edits[i].index;
+                double offset = edits[i].offset;
+                decompressed_data[index] += offset;
+            }
+        }
+        else if (accelerator == MSZ_ACCELERATOR_OMP) {
+            #ifdef OPENMP_ENABLED
+
+            #pragma omp parallel for num_threads(num_omp_threads)
+            for (int i = 0; i < num_edits; ++i) {
+                int index = edits[i].index;
+                double offset = edits[i].offset;
+                decompressed_data[index] += offset;
+            }
+
+            #else
+                return MSZ_ERR_NOT_IMPLEMENTED;
+            #endif
+        }
+        else if (accelerator == MSZ_ACCELERATOR_CUDA) {
+            #ifdef CUDA_ENABLED
+                return MSz_apply_edits_cuda(decompressed_data, num_edits, edits, W, H, D, device_id);
+            #else
+                return MSZ_ERR_NOT_IMPLEMENTED;
+            #endif
+        }
+        else {
+            return MSZ_ERR_UNKNOWN_ERROR;
+        }
+
+        
+        return MSZ_ERR_NO_ERROR;
+    }
+
 
     
 }

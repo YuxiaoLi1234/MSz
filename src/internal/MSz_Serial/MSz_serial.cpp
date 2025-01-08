@@ -1,6 +1,6 @@
-#include "../MSz_Global/MSz_globals.h"
-#include "../../api/MSz.h"
-#include "MSz_serial.h"
+#include "internal/MSz_Global/MSz_globals.h"
+#include "api/MSz.h"
+#include "internal/MSz_Serial/MSz_serial.h"
 // g++-12 -fopenmp -std=c++17 -O3 -g MSz_cpu.cpp -o MSz_cpu
 // g++ -fopenmp hello2.o kernel.o -L/opt/nvidia/hpc_sdk/Linux_x86_64/23.9/cuda/12.2/lib64 -lcudart -o helloworld
 
