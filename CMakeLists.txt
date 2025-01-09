@@ -1,22 +1,25 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(MSz LANGUAGES CXX CUDA C)
+project(MSz LANGUAGES CXX C)
 
 include(GNUInstallDirs)
-find_package(PkgConfig REQUIRED)
-pkg_search_module(ZSTD IMPORTED_TARGET libzstd)
+# find_package(PkgConfig REQUIRED)
+# pkg_search_module(ZSTD IMPORTED_TARGET libzstd)
+
+find_package (zstd REQUIRED)
 
 option(ENABLE_CUDA "Enable CUDA acceleration" OFF)
 
 if (ENABLE_CUDA)
-    find_package(CUDAToolkit)
-    if (CUDAToolkit_FOUND)
-        set(USE_CUDA TRUE)
-        message(STATUS "CUDA support enabled in MSz.")
-    else()
-        message(WARNING "CUDA not found, disabling CUDA acceleration.")
-        set(USE_CUDA FALSE)
-    endif() # 结束 CUDAToolkit_FOUND 检查
+    enable_language (CUDA)
+    # find_package(CUDAToolkit)
+    # if (CUDAToolkit_FOUND)
+    #     set(USE_CUDA TRUE)
+    #     message(STATUS "CUDA support enabled in MSz.")
+    # else()
+    #     message(WARNING "CUDA not found, disabling CUDA acceleration.")
+    #     set(USE_CUDA FALSE)
+    # endif() # 结束 CUDAToolkit_FOUND 检查
 endif() # 结束 ENABLE_CUDA 检查
 
 option(ENABLE_OPENMP "Enable OpenMP acceleration" OFF)
@@ -45,7 +48,7 @@ if (USE_OPENMP)
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-add_library(MSz STATIC ${SRC_FILES})
+add_library(MSz SHARED ${SRC_FILES})
 
 target_compile_features(MSz PRIVATE cxx_std_17)
 
@@ -67,7 +70,8 @@ if (USE_OPENMP)
     target_compile_definitions(MSz PRIVATE OPENMP_ENABLED)
 endif()
 
-target_link_libraries(MSz PRIVATE PkgConfig::ZSTD)
+# target_link_libraries(MSz PRIVATE PkgConfig::ZSTD)
+target_link_libraries(MSz PRIVATE zstd::libzstd)
 
 install(TARGETS MSz
         EXPORT MSzTargets
