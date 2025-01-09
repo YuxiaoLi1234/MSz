@@ -9,7 +9,7 @@
 #include <vector>
 #include <cstdlib>
 #include <fstream>
-#include <stdatomic.h>
+// #include <stdatomic.h>
 #include <cmath>
 #include <parallel/algorithm>  
 #include <unordered_map>
