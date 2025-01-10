@@ -12,6 +12,7 @@ option(ENABLE_CUDA "Enable CUDA acceleration" OFF)
 
 if (ENABLE_CUDA)
     enable_language (CUDA)
+    set (USE_CUDA TRUE)
     # find_package(CUDAToolkit)
     # if (CUDAToolkit_FOUND)
     #     set(USE_CUDA TRUE)
