@@ -1,4 +1,5 @@
-#include "api/MSz.h"
+#include "../../include/api/MSz.h"
+// #include "./MSz_globals.h"
 #include "cuda_runtime.h"
 #include "cublas_v2.h"
 #include <cuda_runtime.h>

@@ -1,4 +1,4 @@
-#include "api/MSz.h"
+#include "../../include/api/MSz.h"
 #include <fstream>
 #include <cstdint>
 #include <sstream>
@@ -20,24 +20,23 @@
 #include <iomanip>
 #include <chrono>
 #include <random>
-
 #include <cstdio>
 #include <zstd.h>
 
 #ifdef OPENMP_ENABLED
     #include <omp.h>
-    #include "internal/MSz_OMP/MSz_omp.h"
+    #include "../internal/MSz_OMP/MSz_omp.h"
 #endif
 
 #ifdef CUDA_ENABLED
     #include "device_launch_parameters.h"
     #include "cuda_runtime.h"
     #include "cublas_v2.h"
-    #include "internal/MSz_CUDA/MSz_CUDA.h"
+    #include "../internal/MSz_CUDA/MSz_CUDA.h"
 #endif
 
-#include "internal/MSz_Serial/MSz_serial.h"
-#include "internal/MSz_Global/MSz_globals.h"
+#include "../internal/MSz_Serial/MSz_serial.h"
+#include "../internal/MSz_Global/MSz_globals.h"
 
 
 

@@ -55,7 +55,7 @@ target_compile_features(MSz PRIVATE cxx_std_17)
 
 target_include_directories(MSz PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>      # 添加 src 目录
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> 
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 

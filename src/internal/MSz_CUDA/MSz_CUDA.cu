@@ -3,8 +3,8 @@
 #include <cublas_v2.h>
 #include <fstream>
 #include <sstream>
-#include "api/MSz.h"
-#include "MSz_CUDA.h"
+#include "../../include/api/MSz.h"
+#include "./MSz_CUDA.h"
 #include <vector>
 #include <cstdlib>
 #include <stdio.h>

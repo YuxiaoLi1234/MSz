@@ -4,9 +4,9 @@
 #include <vector>
 #include <cmath>
 #include <atomic>
-extern int directions[78], direction_to_index_mapping[26][3]; 
-extern "C" {
 
+extern "C" {
+    extern int directions[78], direction_to_index_mapping[26][3]; 
     int getDirection(int x, int y, int z, int maxNeighbors);
 
     int from_direction_to_index(int cur, int direc, int width, int height, int depth, int maxNeighbors);
