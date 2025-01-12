@@ -1,5 +1,5 @@
 #include "../../include/api/MSz.h"
-// #include "./MSz_globals.h"
+#include "./MSz_globals.h"
 #include "cuda_runtime.h"
 #include "cublas_v2.h"
 #include <cuda_runtime.h>
@@ -10,7 +10,7 @@
 #include <vector>
 #include <cstdlib>
 #include <fstream>
-// #include <stdatomic.h>
+#include <stdatomic.h>
 #include <cmath>
 #include <parallel/algorithm>  
 #include <unordered_map>
@@ -75,7 +75,7 @@ extern "C"
         }
         return -1;  
 
-    }
+    };
 
 
     int from_direction_to_index(int cur, int direc, int width, int height, int depth, int maxNeighbors){
