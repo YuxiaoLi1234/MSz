@@ -6,8 +6,9 @@ include(GNUInstallDirs)
 
 find_package(zstd REQUIRED)
 
-option(ENABLE_CUDA "Enable CUDA acceleration" ON)
-option(ENABLE_OPENMP "Enable OpenMP acceleration" ON)
+option(ENABLE_CUDA "Enable CUDA acceleration" OFF)
+option(ENABLE_OPENMP "Enable OpenMP acceleration" OFF)
+
 
 if (ENABLE_CUDA)
     find_package(CUDAToolkit REQUIRED)
