@@ -100,7 +100,7 @@ install(FILES
 
 
 
-add_executable(MSz_CLI ./src/cli/MSz_CLI.cpp) # main.cpp 是命令行接口的源文件
+add_executable(MSz_CLI ./src/cli/MSz_CLI.cpp) 
 
 
 target_link_libraries(MSz_CLI PRIVATE MSz pthread)
@@ -110,3 +110,16 @@ target_compile_features(MSz_CLI PRIVATE cxx_std_17)
 
 install(TARGETS MSz_CLI
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+option(BUILD_EXAMPLES "Build example programs" ON)
+
+if (BUILD_EXAMPLES)
+    message(STATUS "Building example programs.")
+    add_executable(ex1 examples/ex1_MSz_count_faults.cpp)
+    target_link_libraries(ex1 PRIVATE MSz pthread)
+    target_compile_features(ex1 PRIVATE cxx_std_17)
+
+    add_executable(ex2 examples/ex2_MSz_derive_apply_edits.cpp)
+    target_link_libraries(ex2 PRIVATE MSz pthread)
+    target_compile_features(ex2 PRIVATE cxx_std_17)
+endif()
