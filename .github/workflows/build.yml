@@ -20,6 +20,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y build-essential libomp-dev
+          sudo apt install -y build-essential libomp-dev zstd
 
       - name: Detect CUDA and set options
         id: detect
