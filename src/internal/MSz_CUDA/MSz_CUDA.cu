@@ -1,3 +1,6 @@
+#ifndef MSZ_CUDA_H
+#define MSZ_CUDA_H
+
 #include <iostream>
 #include <float.h> 
 #include <cublas_v2.h>
@@ -24,9 +27,9 @@
 #include <iomanip>
 #include <chrono>
 #include <thrust/device_vector.h>
-using std::count;
-using std::cout;
-using std::endl;
+
+
+
 
 
 __device__ double* decp_data;
@@ -100,7 +103,7 @@ __device__ int direction_to_index_mapping_cuda[26][3] =
 };   
 
 
-__device__ int getDirection(int x, int y, int z){
+__device__ int getDirection_cuda(int x, int y, int z){
     
     for (int i = 0; i < maxNeighbors; ++i) {
         if (direction_to_index_mapping_cuda[i][0] == x && direction_to_index_mapping_cuda[i][1] == y && direction_to_index_mapping_cuda[i][2] == z) {
@@ -181,7 +184,7 @@ __global__ void find_direction (int type=0){
     int y_diff = (largetst_index / (width)) % height - (index / (width)) % height;
     int z_diff = (largetst_index /(width * height)) % depth - (index /(width * height)) % depth;
     
-    direction_as[index] = getDirection(x_diff, y_diff,z_diff);
+    direction_as[index] = getDirection_cuda(x_diff, y_diff,z_diff);
     largetst_index = index;
     for(int j =0;j<maxNeighbors;++j){
         int i = adjacency[index*maxNeighbors+j];
@@ -200,7 +203,7 @@ __global__ void find_direction (int type=0){
     x_diff = (largetst_index % width) - (index % width);
     y_diff = (largetst_index / (width)) % height - (index / (width)) % height;
     z_diff = (largetst_index /(width * height)) % depth - (index /(width * height)) % depth;
-    direction_ds[index] = getDirection(x_diff, y_diff,z_diff);
+    direction_ds[index] = getDirection_cuda(x_diff, y_diff,z_diff);
     
     return;
 
@@ -596,7 +599,7 @@ __global__ void fixpath(int direction){
     return;
 };
 
-__global__ void applyDeltaBuffer() {
+__global__ void applyDeltaBuffer_cuda() {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     
     if (tid < num) {
@@ -612,7 +615,7 @@ __global__ void applyDeltaBuffer() {
 }
 
 
-__global__ void getlabel(int *un_sign_ds, int *un_sign_as, int type=0){
+__global__ void getlabel_cuda(int *un_sign_ds, int *un_sign_as, int type=0){
     
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int *direction_as;
@@ -714,7 +717,7 @@ __global__ void getlabel(int *un_sign_ds, int *un_sign_as, int type=0){
 }
 
 
-__global__ void initializeWithIndex(int size, int type=0) {
+__global__ void initializeWithIndex_cuda(int size, int type=0) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int* label;
     if (index < size) {
@@ -756,7 +759,16 @@ __global__ void change_mode(int neighbor_number)
     }
 }
 
+__global__ void apply_edits_kernel(double *d_data, const MSz_edit_t *d_edits, int num_edits) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < num_edits) {
+        int index = d_edits[i].index;
+        double offset = d_edits[i].offset;
+        d_data[index] += offset;
+    }
+}
 
+extern "C" {
 int fix_process(std::vector<int> *a,std::vector<int> *b,
                 std::vector<int> *c,std::vector<int> *d,
                 std::vector<double> *input_data1,std::vector<double> *decp_data1,
@@ -1002,7 +1014,7 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
                 fix_maxi_critical<<<gridnum, blocknum>>>(1,cnt);
             }
             
-            applyDeltaBuffer<<<gridSize, blockSize>>>();
+            applyDeltaBuffer_cuda<<<gridSize, blockSize>>>();
             cudaDeviceSynchronize();
             cudaMemcpyToSymbol(count_f_max, &initialValue, sizeof(int));
             cudaMemcpyToSymbol(count_f_min, &initialValue, sizeof(int));
@@ -1029,8 +1041,8 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
     }
     
 
-    initializeWithIndex<<<gridSize, blockSize>>>(num1,0);
-    initializeWithIndex<<<gridSize, blockSize>>>(num1,1);
+    initializeWithIndex_cuda<<<gridSize, blockSize>>>(num1,0);
+    initializeWithIndex_cuda<<<gridSize, blockSize>>>(num1,1);
     
    
     while(h_un_sign_as>0 or h_un_sign_ds>0){
@@ -1041,7 +1053,7 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
         
         cudaMemcpy(un_sign_as, &zero, sizeof(int), cudaMemcpyHostToDevice);
         cudaMemcpy(un_sign_ds, &zero1, sizeof(int), cudaMemcpyHostToDevice);
-        getlabel<<<gridSize, blockSize>>>(un_sign_as,un_sign_ds,0);
+        getlabel_cuda<<<gridSize, blockSize>>>(un_sign_as,un_sign_ds,0);
         
         cudaMemcpy(&h_un_sign_as, un_sign_as, sizeof(int), cudaMemcpyDeviceToHost);
         cudaMemcpy(&h_un_sign_ds, un_sign_ds, sizeof(int), cudaMemcpyDeviceToHost);
@@ -1063,7 +1075,7 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
 
         cudaMemcpy(un_sign_as, &zero, sizeof(int), cudaMemcpyHostToDevice);
         cudaMemcpy(un_sign_ds, &zero1, sizeof(int), cudaMemcpyHostToDevice);
-        getlabel<<<gridSize, blockSize>>>(un_sign_as,un_sign_ds,1);
+        getlabel_cuda<<<gridSize, blockSize>>>(un_sign_as,un_sign_ds,1);
         
         cudaMemcpy(&h_un_sign_as, un_sign_as, sizeof(int), cudaMemcpyDeviceToHost);
         cudaMemcpy(&h_un_sign_ds, un_sign_ds, sizeof(int), cudaMemcpyDeviceToHost);
@@ -1110,7 +1122,7 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
         fixpath<<<gridSize3, blockSize3>>>(1);
         cudaDeviceSynchronize();
 
-        applyDeltaBuffer<<<gridSize, blockSize>>>();
+        applyDeltaBuffer_cuda<<<gridSize, blockSize>>>();
         cudaDeviceSynchronize();
         
         find_direction<<<gridSize, blockSize>>>();
@@ -1150,7 +1162,7 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
             cudaMemcpyToSymbol(count_f_max, &initialValue, sizeof(int));
             cudaMemcpyToSymbol(count_f_min, &initialValue, sizeof(int));
             
-            applyDeltaBuffer<<<gridSize, blockSize>>>();
+            applyDeltaBuffer_cuda<<<gridSize, blockSize>>>();
             find_direction<<<gridSize,blockSize>>>();
             iscriticle<<<gridSize, blockSize>>>();
             
@@ -1163,7 +1175,7 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
            
         }
         
-        initializeWithIndex<<<gridSize, blockSize>>>(num1,0);
+        initializeWithIndex_cuda<<<gridSize, blockSize>>>(num1,0);
         
         h_un_sign_as = num1;
         h_un_sign_ds = num1;
@@ -1176,7 +1188,7 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
             
             cudaMemcpy(un_sign_as, &zero, sizeof(int), cudaMemcpyHostToDevice);
             cudaMemcpy(un_sign_ds, &zero1, sizeof(int), cudaMemcpyHostToDevice);
-            getlabel<<<gridSize, blockSize>>>(un_sign_as,un_sign_ds,0);
+            getlabel_cuda<<<gridSize, blockSize>>>(un_sign_as,un_sign_ds,0);
             
             cudaMemcpy(&h_un_sign_as, un_sign_as, sizeof(int), cudaMemcpyDeviceToHost);
             cudaMemcpy(&h_un_sign_ds, un_sign_ds, sizeof(int), cudaMemcpyDeviceToHost);
@@ -1429,8 +1441,8 @@ int count_false_cases(std::vector<int> *a,std::vector<int> *b,
     cudaMemcpyFromSymbol(&wrong_min, count_f_min, sizeof(int), 0, cudaMemcpyDeviceToHost);
     
 
-    initializeWithIndex<<<gridSize, blockSize>>>(num1,0);
-    initializeWithIndex<<<gridSize, blockSize>>>(num1,1);
+    initializeWithIndex_cuda<<<gridSize, blockSize>>>(num1,0);
+    initializeWithIndex_cuda<<<gridSize, blockSize>>>(num1,1);
    
     while(h_un_sign_as>0 or h_un_sign_ds>0){
         
@@ -1439,7 +1451,7 @@ int count_false_cases(std::vector<int> *a,std::vector<int> *b,
 
         cudaMemcpy(un_sign_as, &zero, sizeof(int), cudaMemcpyHostToDevice);
         cudaMemcpy(un_sign_ds, &zero1, sizeof(int), cudaMemcpyHostToDevice);
-        getlabel<<<gridSize, blockSize>>>(un_sign_as,un_sign_ds,0);
+        getlabel_cuda<<<gridSize, blockSize>>>(un_sign_as,un_sign_ds,0);
         
         cudaMemcpy(&h_un_sign_as, un_sign_as, sizeof(int), cudaMemcpyDeviceToHost);
         cudaMemcpy(&h_un_sign_ds, un_sign_ds, sizeof(int), cudaMemcpyDeviceToHost);
@@ -1457,7 +1469,7 @@ int count_false_cases(std::vector<int> *a,std::vector<int> *b,
 
         cudaMemcpy(un_sign_as, &zero, sizeof(int), cudaMemcpyHostToDevice);
         cudaMemcpy(un_sign_ds, &zero1, sizeof(int), cudaMemcpyHostToDevice);
-        getlabel<<<gridSize, blockSize>>>(un_sign_as,un_sign_ds,1);
+        getlabel_cuda<<<gridSize, blockSize>>>(un_sign_as,un_sign_ds,1);
         
         cudaMemcpy(&h_un_sign_as, un_sign_as, sizeof(int), cudaMemcpyDeviceToHost);
         cudaMemcpy(&h_un_sign_ds, un_sign_ds, sizeof(int), cudaMemcpyDeviceToHost);
@@ -1478,69 +1490,68 @@ int count_false_cases(std::vector<int> *a,std::vector<int> *b,
     return MSZ_ERR_NO_ERROR;
 }
 
-__global__ void apply_edits_kernel(double *d_data, const MSz_edit_t *d_edits, int num_edits) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < num_edits) {
-        int index = d_edits[i].index;
-        double offset = d_edits[i].offset;
-        d_data[index] += offset;
-    }
-}
 
-int MSz_apply_edits_cuda(
-    double *decompressed_data,     // Input/Output: decompressed data to be modified
-    int num_edits,                 // Input: number of edits to apply
-    const MSz_edit_t *edits,       // Input: array of edits
-    int W, int H, int D,           // Input: dimensions of the data
-    int accelerator,               // Input: hardware accelerator
-    int device_id,                 // Input: GPU device ID (if using CUDA)
-    int num_omp_threads            // Input: number of threads (if using OpenMP)
-) {
+
+
+
+
+    int MSz_apply_edits_cuda(
+        double *decompressed_data,     // Input/Output: decompressed data to be modified
+        int num_edits,                 // Input: number of edits to apply
+        const MSz_edit_t *edits,       // Input: array of edits
+        int W, int H, int D,           // Input: dimensions of the data
+        int accelerator,               // Input: hardware accelerator
+        int device_id,                 // Input: GPU device ID (if using CUDA)
+        int num_omp_threads            // Input: number of threads (if using OpenMP)
+        ) {
+        
+        if (!decompressed_data || !edits || num_edits <= 0 || W <= 0 || H <= 0 || D <= 0) {
+            return MSZ_ERR_INVALID_INPUT;
+        }
+
+        if (accelerator != MSZ_ACCELERATOR_CUDA) {
+            return MSZ_ERR_UNKNOWN_ERROR;
+        }
+
+        
+        cudaSetDevice(device_id);
+
+        
+        int total_size = W * H * D;
+
+        
+        double *d_data = nullptr;
+        MSz_edit_t *d_edits = nullptr;
+        cudaMalloc((void**)&d_data, total_size * sizeof(double));
+        cudaMalloc((void**)&d_edits, num_edits * sizeof(MSz_edit_t));
+
+        
+        cudaMemcpy(d_data, decompressed_data, total_size * sizeof(double), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_edits, edits, num_edits * sizeof(MSz_edit_t), cudaMemcpyHostToDevice);
+
+        
+        int block_size = 256;
+        int grid_size = (num_edits + block_size - 1) / block_size;
+        apply_edits_kernel<<<grid_size, block_size>>>(d_data, d_edits, num_edits);
+
     
-    if (!decompressed_data || !edits || num_edits <= 0 || W <= 0 || H <= 0 || D <= 0) {
-        return MSZ_ERR_INVALID_INPUT;
-    }
+        cudaError_t err = cudaGetLastError();
+        if (err != cudaSuccess) {
+            cudaFree(d_data);
+            cudaFree(d_edits);
+            return MSZ_ERR_UNKNOWN_ERROR;
+        }
 
-    if (accelerator != MSZ_ACCELERATOR_CUDA) {
-        return MSZ_ERR_UNKNOWN_ERROR;
-    }
+        
+        cudaMemcpy(decompressed_data, d_data, total_size * sizeof(double), cudaMemcpyDeviceToHost);
 
-    
-    cudaSetDevice(device_id);
-
-    
-    int total_size = W * H * D;
-
-    
-    double *d_data = nullptr;
-    MSz_edit_t *d_edits = nullptr;
-    cudaMalloc((void**)&d_data, total_size * sizeof(double));
-    cudaMalloc((void**)&d_edits, num_edits * sizeof(MSz_edit_t));
-
-    
-    cudaMemcpy(d_data, decompressed_data, total_size * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_edits, edits, num_edits * sizeof(MSz_edit_t), cudaMemcpyHostToDevice);
-
-    
-    int block_size = 256;
-    int grid_size = (num_edits + block_size - 1) / block_size;
-    apply_edits_kernel<<<grid_size, block_size>>>(d_data, d_edits, num_edits);
-
-   
-    cudaError_t err = cudaGetLastError();
-    if (err != cudaSuccess) {
+        
         cudaFree(d_data);
         cudaFree(d_edits);
-        return MSZ_ERR_UNKNOWN_ERROR;
+
+        return MSZ_ERR_NO_ERROR;
     }
 
-    
-    cudaMemcpy(decompressed_data, d_data, total_size * sizeof(double), cudaMemcpyDeviceToHost);
-
-    
-    cudaFree(d_data);
-    cudaFree(d_edits);
-
-    return MSZ_ERR_NO_ERROR;
 }
 
+#endif // MSZ_CUDA_H

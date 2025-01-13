@@ -40,13 +40,13 @@
 
 
 
-extern int fix_process(std::vector<int> *a,std::vector<int> *b,std::vector<int> *c,std::vector<int> *d,std::vector<double> *input_data,std::vector<double> *decompressed_data,std::vector<int>* dec_label1,std::vector<int>* or_label1, int W, int H, int D, double bound, int preserve_min, int preserve_max, int preserve_path, int connectivity_type, int device_id);
-extern int count_false_cases(std::vector<int> *a,std::vector<int> *b,
-                std::vector<int> *c,std::vector<int> *d,
-                std::vector<double> *input_data1,std::vector<double> *decp_data1,
-                std::vector<int>* dec_label1,std::vector<int>* or_label1, 
-                int width1, int height1, int depth1, int neighbor_number,
-                int &wrong_min, int &wrong_max,  int &wrong_labels, int device_id);
+// extern int fix_process(std::vector<int> *a,std::vector<int> *b,std::vector<int> *c,std::vector<int> *d,std::vector<double> *input_data,std::vector<double> *decompressed_data,std::vector<int>* dec_label1,std::vector<int>* or_label1, int W, int H, int D, double bound, int preserve_min, int preserve_max, int preserve_path, int connectivity_type, int device_id);
+// extern int count_false_cases(std::vector<int> *a,std::vector<int> *b,
+//                 std::vector<int> *c,std::vector<int> *d,
+//                 std::vector<double> *input_data1,std::vector<double> *decp_data1,
+//                 std::vector<int>* dec_label1,std::vector<int>* or_label1, 
+//                 int width1, int height1, int depth1, int neighbor_number,
+//                 int &wrong_min, int &wrong_max,  int &wrong_labels, int device_id);
 extern "C" {
 
     int MSz_derive_edits(

@@ -3,27 +3,18 @@ cmake_minimum_required(VERSION 3.20)
 project(MSz LANGUAGES CXX C)
 
 include(GNUInstallDirs)
-# find_package(PkgConfig REQUIRED)
-# pkg_search_module(ZSTD IMPORTED_TARGET libzstd)
 
-find_package (zstd REQUIRED)
+find_package(zstd REQUIRED)
 
-option(ENABLE_CUDA "Enable CUDA acceleration" OFF)
+option(ENABLE_CUDA "Enable CUDA acceleration" ON)
+option(ENABLE_OPENMP "Enable OpenMP acceleration" ON)
 
 if (ENABLE_CUDA)
-    enable_language (CUDA)
-    set (USE_CUDA TRUE)
-    # find_package(CUDAToolkit)
-    # if (CUDAToolkit_FOUND)
-    #     set(USE_CUDA TRUE)
-    #     message(STATUS "CUDA support enabled in MSz.")
-    # else()
-    #     message(WARNING "CUDA not found, disabling CUDA acceleration.")
-    #     set(USE_CUDA FALSE)
-    # endif() # 结束 CUDAToolkit_FOUND 检查
-endif() # 结束 ENABLE_CUDA 检查
+    find_package(CUDAToolkit REQUIRED)
+    enable_language(CUDA)
+    set(USE_CUDA TRUE)
+endif()
 
-option(ENABLE_OPENMP "Enable OpenMP acceleration" OFF)
 if (ENABLE_OPENMP)
     find_package(OpenMP)
     if (OpenMP_CXX_FOUND)
@@ -33,6 +24,7 @@ if (ENABLE_OPENMP)
         set(USE_OPENMP FALSE)
     endif()
 endif()
+
 
 set(SRC_FILES
     ./src/api/MSz.cpp
@@ -59,7 +51,6 @@ target_include_directories(MSz PUBLIC
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-
 if (USE_CUDA)
     target_link_libraries(MSz PRIVATE CUDA::cudart)
     target_compile_definitions(MSz PRIVATE CUDA_ENABLED)
@@ -71,8 +62,8 @@ if (USE_OPENMP)
     target_compile_definitions(MSz PRIVATE OPENMP_ENABLED)
 endif()
 
-# target_link_libraries(MSz PRIVATE PkgConfig::ZSTD)
 target_link_libraries(MSz PRIVATE zstd::libzstd)
+
 
 install(TARGETS MSz
         EXPORT MSzTargets
@@ -88,7 +79,6 @@ install(EXPORT MSzTargets
         NAMESPACE MSz::
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MSz)
 
-
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/MSzConfigVersion.cmake"
@@ -97,7 +87,7 @@ write_basic_package_version_file(
 )
 
 configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/MSzConfig.cmake.in" # 位于根目录
+    "${CMAKE_CURRENT_SOURCE_DIR}/MSzConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/MSzConfig.cmake"
     INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MSz
 )
@@ -106,3 +96,16 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/MSzConfig.cmake"
     "${CMAKE_CURRENT_BINARY_DIR}/MSzConfigVersion.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MSz)
+
+
+
+add_executable(MSz_CLI ./src/cli/MSz_CLI.cpp) # main.cpp 是命令行接口的源文件
+
+
+target_link_libraries(MSz_CLI PRIVATE MSz pthread)
+
+target_compile_features(MSz_CLI PRIVATE cxx_std_17)
+
+
+install(TARGETS MSz_CLI
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
