@@ -302,8 +302,7 @@ extern "C"
                         const std::vector<int> *or_direction_as, const std::vector<int> *or_direction_ds, 
                         const std::vector<int> *de_direction_as, const std::vector<int> *de_direction_ds, 
                         std::vector<double> &d_deltaBuffer,int index, int direction, std::atomic<int>* id_array,
-                        double bound, int width, int height, int depth, int maxNeighbors
-    ){
+                        double bound, int width, int height, int depth, int maxNeighbors){
         double delta;
         if(direction == 0){
             int cur = index;

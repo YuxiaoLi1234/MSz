@@ -96,6 +96,7 @@ extern "C" {
         auto max_it = std::max_element(input_data.begin(), input_data.end());
         double minValue = *min_it;
         double maxValue = *max_it;
+        
         double bound = (maxValue-minValue)*rel_err_bound;
 
         std::vector<int> or_direction_as, or_direction_ds, de_direction_as1, de_direction_ds1, dec_label1, or_label1;

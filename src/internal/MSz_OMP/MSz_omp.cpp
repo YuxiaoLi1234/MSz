@@ -278,7 +278,7 @@ extern "C"
         std::atomic<int>* id_array = new std::atomic<int>[data_size];
         int maxNeighbors = 26;
 
-        d_deltaBuffer.resize(data_size,-2.0 * bound);
+        d_deltaBuffer.resize(data_size,-4.0 * bound);
 
         adjacency.resize(data_size*maxNeighbors, -1);
         false_max.resize(data_size);
