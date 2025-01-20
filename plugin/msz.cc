@@ -94,14 +94,14 @@ public:
         return "msz_false_label_ratio";
     }
 
-private:
-    compat::optional<double> false_label_ratio;
-};
+    private:
+        compat::optional<double> false_label_ratio;
+    };
 
 
-static pressio_register msz_false_label_ratio_plugin(metrics_plugins(), "msz_false_label_ratio", []() {
-    return compat::make_unique<MSzFalseLabelRatioPlugin>();
-});
+    static pressio_register msz_false_label_ratio_plugin(metrics_plugins(), "msz_false_label_ratio", []() {
+        return compat::make_unique<MSzFalseLabelRatioPlugin>();
+    });
 
-}  // namespace msz_false_label_ratio
+    }  // namespace msz_false_label_ratio
 }  // namespace libpressio

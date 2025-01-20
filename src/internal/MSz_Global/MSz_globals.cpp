@@ -184,11 +184,7 @@ extern "C"
                     if ( d > oldValue ) {
                         swap(index, d, d_deltaBuffer);
                     }  
-                    
-
                     return;
-                    
-                    
                 
                 }
                 else{
@@ -219,9 +215,10 @@ extern "C"
                 
                 
                 if ((*or_direction_ds)[index]!=-1){
-                
+                    
                     next_vertex= from_direction_to_index(index,(*or_direction_ds)[index], width, height, depth, maxNeighbors);
-                    double d = (((*input_data)[next_vertex] - bound) + (*decp_data)[index]) / 2.0 - (*decp_data)[next_vertex];
+                    
+                    double d = (((*input_data)[next_vertex] - bound) + (*decp_data)[next_vertex]) / 2.0 - (*decp_data)[next_vertex];
                     
                     if((*decp_data)[index]>(*decp_data)[next_vertex] or ((*decp_data)[index]==(*decp_data)[next_vertex] and index>next_vertex)){
                         return;
@@ -240,6 +237,7 @@ extern "C"
                 else{
                     
                     int largest_index = from_direction_to_index(index,(*de_direction_ds)[index], width, height, depth, maxNeighbors);
+        
                     if((*decp_data)[index]<(*decp_data)[largest_index] or ((*decp_data)[index]==(*decp_data)[largest_index] and index<largest_index)){
                         
                         return;

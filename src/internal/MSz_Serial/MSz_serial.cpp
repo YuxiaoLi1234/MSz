@@ -177,9 +177,8 @@ extern "C"
             
                 for (int index=0; index<maxNeighbors; index++) {
                     int j = (*adjacency)[i*maxNeighbors+index];
-                    if(j==-1){
-                        continue;
-                    }
+                    if(j==-1) continue;
+                    
                     if ((*decp_data)[j] > (*decp_data)[i]) {
                         
                         is_maxima = false;
@@ -236,6 +235,7 @@ extern "C"
         
         for(int i=0;i<data_size;i++){
             if((*d_deltaBuffer)[i] > -4.0 * bound){
+                
                 if(std::abs((*d_deltaBuffer)[i]) > 1e-15) decp_data[i] += (*d_deltaBuffer)[i];
                 else decp_data[i] = (*input_data)[i] - bound;
             }
@@ -260,6 +260,7 @@ extern "C"
 
         int maxNeighbors = neighbor_number == 1?26:12;
         d_deltaBuffer.resize(data_size,-4.0 * bound);
+        
         adjacency.resize(data_size*maxNeighbors, -1);
         false_max.resize(data_size);
         false_min.resize(data_size);
@@ -285,8 +286,7 @@ extern "C"
         if(preserve_min == 0) count_f_min = 0;
 
         while (count_f_max>0 or count_f_min>0){
-                
-                
+
                 initialization_cpu(d_deltaBuffer, data_size, bound);
 
                 for(auto i = 0; i < count_f_max; i ++){
@@ -295,9 +295,8 @@ extern "C"
                     
                     fix_maxi_critical(input_data, decp_data, or_direction_as, or_direction_ds, 
                             de_direction_as, de_direction_ds, 
-                            d_deltaBuffer,
-                            width, height, depth, maxNeighbors, bound,
-                            critical_i,0);
+                            d_deltaBuffer, width, height, depth, maxNeighbors, bound,
+                            critical_i, 0);
 
                 }
     
@@ -313,16 +312,19 @@ extern "C"
                 }
                     
                 applyDeltaBuffer_cpu(&d_deltaBuffer, input_data, *decp_data, data_size, bound);
+
                 find_direction_cpu(decp_data, &adjacency, *de_direction_as, *de_direction_ds, width, height, depth, maxNeighbors);
                 get_false_criticle_points_cpu(count_f_max, count_f_min, &adjacency,
                                     decp_data, or_direction_as, or_direction_ds, false_min, false_max, maxNeighbors, data_size);
                 if(preserve_max == 0) count_f_max = 0;
                 if(preserve_min == 0) count_f_min = 0;
+
         }
+        if(preserve_path ==0 || preserve_max == 0 || preserve_min == 0) return MSZ_ERR_NO_ERROR;
 
         mappath_cpu(*dec_label, de_direction_as, de_direction_ds, width, height, depth, maxNeighbors);
         
-        if(preserve_path ==0 || preserve_max == 0 || preserve_min == 0) return MSZ_ERR_NO_ERROR;
+        
         
         std::vector<int> wrong_index_as;
         std::vector<int> wrong_index_ds;

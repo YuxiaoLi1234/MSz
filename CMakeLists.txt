@@ -9,11 +9,12 @@ find_package(zstd REQUIRED)
 option(ENABLE_CUDA "Enable CUDA acceleration" OFF)
 option(ENABLE_OPENMP "Enable OpenMP acceleration" OFF)
 
-
 if (ENABLE_CUDA)
     find_package(CUDAToolkit REQUIRED)
     enable_language(CUDA)
     set(USE_CUDA TRUE)
+
+    set(CMAKE_CUDA_ARCHITECTURES native)
 endif()
 
 if (ENABLE_OPENMP)
@@ -25,7 +26,6 @@ if (ENABLE_OPENMP)
         set(USE_OPENMP FALSE)
     endif()
 endif()
-
 
 set(SRC_FILES
     ./src/api/MSz.cpp
@@ -47,9 +47,8 @@ add_library(MSz SHARED ${SRC_FILES})
 target_compile_features(MSz PRIVATE cxx_std_17)
 
 target_include_directories(MSz PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> 
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>       
+    $<INSTALL_INTERFACE:include/MSz>                            
 )
 
 if (USE_CUDA)
@@ -68,12 +67,15 @@ target_link_libraries(MSz PRIVATE zstd::libzstd)
 
 install(TARGETS MSz
         EXPORT MSzTargets
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} 
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}  
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/api/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/MSz/api
+        FILES_MATCHING PATTERN "*.h")
+
 
 install(EXPORT MSzTargets
         FILE MSzTargets.cmake
@@ -99,14 +101,12 @@ install(FILES
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MSz)
 
 
-
-add_executable(MSz_CLI ./src/cli/MSz_CLI.cpp) 
+add_executable(MSz_CLI ./src/cli/MSz_CLI.cpp)
+target_link_libraries(MSz_CLI PRIVATE MSz pthread)
 
 
 target_link_libraries(MSz_CLI PRIVATE MSz pthread)
-
 target_compile_features(MSz_CLI PRIVATE cxx_std_17)
-
 
 install(TARGETS MSz_CLI
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
