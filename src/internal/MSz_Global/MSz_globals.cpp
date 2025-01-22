@@ -5,7 +5,6 @@
 #include <vector>
 #include <cstdlib>
 #include <fstream>
-#include <stdatomic.h>
 #include <cmath>
 #include <unordered_map>
 #include <random>
