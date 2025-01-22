@@ -1,8 +1,4 @@
 #include "./MSz_globals.h"
-#include "cuda_runtime.h"
-#include "cublas_v2.h"
-#include <cuda_runtime.h>
-#include "device_launch_parameters.h"
 #include <fstream>
 #include <sstream>
 #include <cfloat>
@@ -11,12 +7,10 @@
 #include <fstream>
 #include <stdatomic.h>
 #include <cmath>
-#include <parallel/algorithm>  
 #include <unordered_map>
 #include <random>
 #include <atomic>
 #include <string>
-#include <omp.h>
 #include <iostream>
 #include <unordered_set>
 #include <set>
