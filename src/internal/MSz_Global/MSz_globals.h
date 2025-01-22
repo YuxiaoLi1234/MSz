@@ -4,6 +4,7 @@
 #include <vector>
 #include <cmath>
 #include <atomic>
+#include "../../../include/api/MSz.h"
 
 extern "C" {
     extern int directions[78], direction_to_index_mapping[26][3]; 

@@ -1,5 +1,4 @@
 #include "../MSz_Global/MSz_globals.h"
-#include "../../include/api/MSz.h"
 #include "./MSz_serial.h"
 
 extern "C"

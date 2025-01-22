@@ -4,6 +4,7 @@
 #include <vector>
 #include <cmath>
 #include <atomic>
+#include "../../../include/api/MSz.h"
 
 extern "C" {
     

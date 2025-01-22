@@ -2,7 +2,7 @@
 #define MSZ_CUDA_H
 
 #include <cstdint>
-#include "api/MSz.h" 
+#include "../../../include/api/MSz.h"
 
 
 extern "C" {
