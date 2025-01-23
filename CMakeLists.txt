@@ -6,7 +6,7 @@ include(GNUInstallDirs)
 
 option(ENABLE_CUDA "Enable CUDA acceleration" OFF)
 option(ENABLE_OPENMP "Enable OpenMP acceleration" OFF)
-option(ENABLE_ZSTD "Enable Zstd compression" ON)
+option(ENABLE_ZSTD "Enable Zstd compression" OFF)
 option(BUILD_EXAMPLES "Build example programs" ON)
 
 if (ENABLE_ZSTD)
