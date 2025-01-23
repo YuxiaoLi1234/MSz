@@ -4,10 +4,14 @@ project(MSz LANGUAGES CXX C)
 
 include(GNUInstallDirs)
 
-find_package(zstd REQUIRED)
-
 option(ENABLE_CUDA "Enable CUDA acceleration" OFF)
 option(ENABLE_OPENMP "Enable OpenMP acceleration" OFF)
+option(ENABLE_ZSTD "Enable Zstd compression" ON)
+option(BUILD_EXAMPLES "Build example programs" ON)
+
+if (ENABLE_ZSTD)
+    find_package(zstd REQUIRED)
+endif()
 
 if (ENABLE_CUDA)
     find_package(CUDAToolkit REQUIRED)
@@ -62,7 +66,11 @@ if (USE_OPENMP)
     target_compile_definitions(MSz PRIVATE OPENMP_ENABLED)
 endif()
 
-target_link_libraries(MSz PRIVATE zstd::libzstd)
+if (ENABLE_ZSTD)
+    target_link_libraries(MSz PRIVATE zstd::libzstd)
+endif()
+
+
 
 
 install(TARGETS MSz
@@ -110,8 +118,6 @@ target_compile_features(MSz_CLI PRIVATE cxx_std_17)
 
 install(TARGETS MSz_CLI
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-option(BUILD_EXAMPLES "Build example programs" ON)
 
 if (BUILD_EXAMPLES)
     message(STATUS "Building example programs.")
