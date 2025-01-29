@@ -17,8 +17,13 @@ if (ENABLE_CUDA)
     find_package(CUDAToolkit REQUIRED)
     enable_language(CUDA)
     set(USE_CUDA TRUE)
-
-    set(CMAKE_CUDA_ARCHITECTURES native)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if (CMAKE_CUDA_COMPILER_VERSION VERSION_GREATER_EQUAL 11)
+        set(CMAKE_CUDA_ARCHITECTURES ${CMAKE_CUDA_COMPATIBLE_COMPUTE_CAPABILITIES})
+    else()
+        message(FATAL_ERROR "CUDA architectures must be manually specified for CUDA versions < 11")
+    endif()
 endif()
 
 if (ENABLE_OPENMP)
@@ -30,6 +35,7 @@ if (ENABLE_OPENMP)
         set(USE_OPENMP FALSE)
     endif()
 endif()
+
 
 set(SRC_FILES
     ./src/api/MSz.cpp
@@ -45,14 +51,20 @@ if (USE_OPENMP)
     list(APPEND SRC_FILES ./src/internal/MSz_OMP/MSz_omp.cpp)
 endif()
 
+
+
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_library(MSz SHARED ${SRC_FILES})
 
 target_compile_features(MSz PRIVATE cxx_std_17)
 
 target_include_directories(MSz PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>       
-    $<INSTALL_INTERFACE:include/MSz>                            
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>   # 项目中的公共头文件目录
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/internal/MSz_Global>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/internal/MSz_OMP>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/internal/MSz_Serial>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/internal/MSz_CUDA>
+    $<INSTALL_INTERFACE:include/MSz> 
 )
 
 if (USE_CUDA)

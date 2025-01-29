@@ -4,7 +4,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <stdexcept>
-#include "../../include/api/MSz.h" 
+#include "api/MSz.h" 
 
 void print_usage() {
     std::cerr << "Usage:" << std::endl;

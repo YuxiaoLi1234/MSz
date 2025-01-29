@@ -74,7 +74,7 @@ struct MSz_edit_t {
 
 
 
-extern "C" {
+
   /**
   * @brief API for computing topology-preserving edits.
   * This API computes a series of edits to apply to decompressed data, ensuring the preservation 
@@ -411,7 +411,7 @@ extern "C" {
       int num_omp_threads = 1        // Input: number of threads (if using OpenMP)
   );
 
-}
+
 
 
 #endif // _MSZ_API_H
