@@ -6,13 +6,20 @@ include(GNUInstallDirs)
 
 option(ENABLE_CUDA "Enable CUDA acceleration" OFF)
 option(ENABLE_OPENMP "Enable OpenMP acceleration" OFF)
-option(ENABLE_ZSTD "Enable Zstd compression" OFF)
+option(ENABLE_ZSTD "Enable Zstd compression" ON)
 option(BUILD_EXAMPLES "Build example programs" ON)
 
+# Zstd integration using pkg-config
 if (ENABLE_ZSTD)
-    find_package(zstd REQUIRED)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(Zstd REQUIRED libzstd)
+
+    if (NOT Zstd_FOUND)
+        message(FATAL_ERROR "Zstd was not found. Please ensure it is installed and pkg-config is configured correctly.")
+    endif()
 endif()
 
+# CUDA integration
 if (ENABLE_CUDA)
     find_package(CUDAToolkit REQUIRED)
     enable_language(CUDA)
@@ -26,6 +33,7 @@ if (ENABLE_CUDA)
     endif()
 endif()
 
+# OpenMP integration
 if (ENABLE_OPENMP)
     find_package(OpenMP)
     if (OpenMP_CXX_FOUND)
@@ -36,7 +44,7 @@ if (ENABLE_OPENMP)
     endif()
 endif()
 
-
+# Source files
 set(SRC_FILES
     ./src/api/MSz.cpp
     ./src/internal/MSz_Global/MSz_globals.cpp
@@ -51,8 +59,7 @@ if (USE_OPENMP)
     list(APPEND SRC_FILES ./src/internal/MSz_OMP/MSz_omp.cpp)
 endif()
 
-
-
+# Define the MSz shared library
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_library(MSz SHARED ${SRC_FILES})
 
@@ -67,35 +74,37 @@ target_include_directories(MSz PUBLIC
     $<INSTALL_INTERFACE:include/MSz> 
 )
 
+# CUDA linkage
 if (USE_CUDA)
     target_link_libraries(MSz PRIVATE CUDA::cudart)
     target_compile_definitions(MSz PRIVATE CUDA_ENABLED)
     set_target_properties(MSz PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 endif()
 
+# OpenMP linkage
 if (USE_OPENMP)
     target_link_libraries(MSz PRIVATE OpenMP::OpenMP_CXX)
     target_compile_definitions(MSz PRIVATE OPENMP_ENABLED)
 endif()
 
+# Zstd linkage using pkg-config
 if (ENABLE_ZSTD)
-    target_link_libraries(MSz PRIVATE zstd::libzstd)
+    target_include_directories(MSz PRIVATE ${Zstd_INCLUDE_DIRS})
+    target_link_directories(MSz PRIVATE ${Zstd_LIBRARY_DIRS})
+    target_link_libraries(MSz PRIVATE ${Zstd_LIBRARIES})
+    target_compile_options(MSz PRIVATE ${Zstd_CFLAGS_OTHER})
 endif()
 
-
-
-
+# Installation configuration
 install(TARGETS MSz
         EXPORT MSzTargets
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/api/
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/MSz/api
         FILES_MATCHING PATTERN "*.h")
-
 
 install(EXPORT MSzTargets
         FILE MSzTargets.cmake
@@ -120,17 +129,16 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/MSzConfigVersion.cmake"
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/MSz)
 
-
+# MSz CLI executable
 add_executable(MSz_CLI ./src/cli/MSz_CLI.cpp)
 target_link_libraries(MSz_CLI PRIVATE MSz pthread)
 
-
-target_link_libraries(MSz_CLI PRIVATE MSz pthread)
 target_compile_features(MSz_CLI PRIVATE cxx_std_17)
 
 install(TARGETS MSz_CLI
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
+# Examples
 if (BUILD_EXAMPLES)
     message(STATUS "Building example programs.")
     add_executable(ex1 examples/ex1_MSz_count_faults.cpp)
