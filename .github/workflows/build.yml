@@ -31,13 +31,13 @@ jobs:
       
       - name: Install zstd (if needed)
         if: matrix.ENABLE_ZSTD == 'ON'
-          run: |
-            sudo apt install -y build-essential zstd
+        run: |
+          sudo apt install -y build-essential zstd
       
       - name: Install OPENMP (if needed)
         if: matrix.ENABLE_OPENMP == 'ON'
-          run: |
-            sudo apt install -y build-essential libomp-dev
+        run: |
+          sudo apt install -y build-essential libomp-dev
 
       - name: Set CUDA flag
         run: |
