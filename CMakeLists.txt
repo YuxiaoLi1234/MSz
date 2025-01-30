@@ -61,7 +61,7 @@ add_library(MSz SHARED ${SRC_FILES})
 target_compile_features(MSz PRIVATE cxx_std_17)
 
 target_include_directories(MSz PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>   # 项目中的公共头文件目录
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>   
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/internal/MSz_Global>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/internal/MSz_OMP>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/internal/MSz_Serial>
