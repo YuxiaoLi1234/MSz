@@ -5,13 +5,43 @@
 #include <cstdlib>
 #include <stdexcept>
 #include "api/MSz.h" 
-
 void print_usage() {
-    std::cerr << "Usage:" << std::endl;
-    std::cerr << "  ./MSz_CLI count_faults <original_file> <decompressed_file> <width> <height> <depth> <connectivity> --mode <none|omp|cuda>" << std::endl;
-    std::cerr << "  ./MSz_CLI derive_edits <original_file> <decompressed_file> <width> <height> <depth> <connectivity> <error_bound> <preserve_min> <preserve_max> <preserve_path> --mode <none|omp|cuda>" << std::endl;
-    std::cerr << "  ./MSz_CLI apply_edits <decompressed_file> <edits_file> <width> <height> <depth> --mode <none|omp|cuda>" << std::endl;
+    std::cerr << "Usage:\n";
+    std::cerr << "\nCommands:\n";
+
+    std::cerr << "  ./MSz_CLI count_faults <original_file> <decompressed_file> <width> <height> <depth> <connectivity> --mode <none|omp|cuda>\n";
+    std::cerr << "  ./MSz_CLI derive_edits <original_file> <decompressed_file> <width> <height> <depth> <connectivity> <error_bound> <preserve_min> <preserve_max> <preserve_path> --mode <none|omp|cuda>\n";
+    std::cerr << "  ./MSz_CLI apply_edits <decompressed_file> <edits_file> <width> <height> <depth> --mode <none|omp|cuda>\n";
+
+    std::cerr << "\nOptions:\n";
+
+    std::cerr << "  <original_file>      Path to the original uncompressed data file.\n";
+    std::cerr << "  <decompressed_file>  Path to the decompressed data file to analyze or modify.\n";
+    std::cerr << "  <edits_file>         Path to the file containing computed edits (required for apply_edits).\n";
+    std::cerr << "  <width>              Width (x-dimension) of the dataset.\n";
+    std::cerr << "  <height>             Height (y-dimension) of the dataset.\n";
+    std::cerr << "  <depth>              Depth (z-dimension) of the dataset (set to 1 for 2D data).\n";
+    std::cerr << "  <connectivity>       Connectivity type:\n";
+    std::cerr << "                         0 - Piecewise connectivity (e.g., 2D: up, down, left, right, upper-right and lower-left)\n";
+    std::cerr << "                         1 - Full connectivity (e.g., 2D: all directions including diagonals)\n";
+    std::cerr << "  <error_bound>        Floating-point value specifying the error bound (e.g., 1E-3, 0.01) [Only for derive_edits].\n";
+    std::cerr << "  <preserve_min>       Preserve minima (1 = Yes, 0 = No) [Only for derive_edits].\n";
+    std::cerr << "  <preserve_max>       Preserve maxima (1 = Yes, 0 = No) [Only for derive_edits].\n";
+    std::cerr << "  <preserve_path>      Preserve separatrices (1 = Yes, 0 = No) [Only for derive_edits and connectivity == 0].\n";
+    std::cerr << "  --mode <exec_mode>   Execution mode:\n";
+    std::cerr << "                         none  - Pure CPU execution\n";
+    std::cerr << "                         omp   - OpenMP parallel execution\n";
+    std::cerr << "                         cuda  - GPU acceleration using CUDA\n";
+
+    std::cerr << "\nExamples:\n";
+    std::cerr << "  Detect topology faults in a dataset:\n";
+    std::cerr << "    ./MSz_CLI count_faults original.bin decompressed.bin 100 100 100 0 --mode cuda\n";
+    std::cerr << "\n  Compute topology-preserving edits:\n";
+    std::cerr << "    ./MSz_CLI derive_edits original.bin decompressed.bin 100 100 100 0 1E-3 1 1 1 --mode omp\n";
+    std::cerr << "\n  Apply topology-preserving edits:\n";
+    std::cerr << "    ./MSz_CLI apply_edits decompressed.bin edits.bin 100 100 100 --mode cuda\n";
 }
+
 
 void save_edits(const std::string& file_path, const MSz_edit_t* edits, int num_edits) {
     if (num_edits <= 0 || edits == nullptr) {
