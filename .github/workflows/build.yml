@@ -22,13 +22,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3  
 
-      - name: Install dependencies
+      - name: Install CUDA Toolkit (if needed)
+        if: matrix.ENABLE_CUDA == 'ON'
         run: |
-          sudo apt update
-          sudo apt install -y build-essential libomp-dev zstd
+          sudo apt install -y nvidia-cuda-toolkit
+          echo "/usr/local/cuda/bin" >> $GITHUB_PATH
+          nvcc --version  
+      
+      - name: Install zstd (if needed)
+        if: matrix.ENABLE_ZSTD == 'ON'
+          run: |
+            sudo apt install -y build-essential zstd
+      
+      - name: Install OPENMP (if needed)
+        if: matrix.ENABLE_OPENMP == 'ON'
+          run: |
+            sudo apt install -y build-essential libomp-dev
 
-      - name: Detect CUDA and set options
-        id: detect
+      - name: Set CUDA flag
         run: |
           if [[ "${{ matrix.ENABLE_CUDA }}" == "OFF" ]]; then
             echo "CUDA disabled by matrix"
@@ -42,13 +53,12 @@ jobs:
           fi
         shell: bash
 
-
       - name: Build project
         run: |
           mkdir build
           cd build
           cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/my_project_install \
-                   -DENABLE_CUDA=${{ matrix.ENABLE_CUDA }} \
+                   -DENABLE_CUDA=${{ env.ENABLE_CUDA }} \
                    -DENABLE_OPENMP=${{ matrix.ENABLE_OPENMP }} \
                    -DENABLE_ZSTD=${{ matrix.ENABLE_ZSTD }} \
                    -DBUILD_EXAMPLES=${{ matrix.BUILD_EXAMPLES }}
