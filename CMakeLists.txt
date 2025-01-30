@@ -11,12 +11,7 @@ option(BUILD_EXAMPLES "Build example programs" ON)
 
 # Zstd integration using pkg-config
 if (ENABLE_ZSTD)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(Zstd REQUIRED libzstd)
-
-    if (NOT Zstd_FOUND)
-        message(FATAL_ERROR "Zstd was not found. Please ensure it is installed and pkg-config is configured correctly.")
-    endif()
+    find_package(zstd REQUIRED)
 endif()
 
 # CUDA integration
@@ -87,7 +82,6 @@ if (USE_OPENMP)
     target_compile_definitions(MSz PRIVATE OPENMP_ENABLED)
 endif()
 
-# Zstd linkage using pkg-config
 if (ENABLE_ZSTD)
     target_include_directories(MSz PRIVATE ${Zstd_INCLUDE_DIRS})
     target_link_directories(MSz PRIVATE ${Zstd_LIBRARY_DIRS})
