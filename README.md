@@ -1,14 +1,28 @@
 # MSz: An Efficient Parallel Algorithm for Correcting Morse-Smale Segmentations in Error-Bounded Lossy Compressors
 
-MSz is designed to preserve topological features such as local minima, maxima, and integral paths with user-defined connectivity modes for 2D/3D datasets.
+**MSZ** is designed to preserve topological features such as local minima, maxima, and integral paths with user-defined connectivity modes for 2D/3D datasets. The API supports **GPU acceleration (CUDA)** and **multi-threaded CPU execution (OpenMP)**.
+---
 
-## Requirements
-- C++17 or later
-- CMake 3.18 or later
-- CUDA (if needed)
-- OpenMP (if needed)
+## 📦 **Installation**
 
-## Installation
+### **1️⃣ Dependencies**
+- C++ compiler (C++11 or later)
+- CMake 3.10+
+- OpenMP (optional)
+- CUDA 11+ (optional)
+- Zstandard (Zstd) for edit compression
+
+### **2️⃣ Build Instructions**
+Use CMake to compile the project:
+```bash
+git clone --recursive https://github.com/YuxiaoLi1234/MSz.git
+cd MSz
+mkdir build && cd build
+cmake .. -DENABLE_CUDA=ON -DENABLE_OPENMP=ON -DENABLE_ZSTD=ON
+make -j$(nproc)
+make install
+```
+<!-- ## Installation
 ### 1. Clone the Repository
 ```bash
 git clone --recursive https://github.com/YuxiaoLi1234/MSz.git
@@ -57,4 +71,4 @@ make
 
 
 
-
+ -->

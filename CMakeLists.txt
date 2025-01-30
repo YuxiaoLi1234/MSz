@@ -6,7 +6,7 @@ include(GNUInstallDirs)
 
 option(ENABLE_CUDA "Enable CUDA acceleration" OFF)
 option(ENABLE_OPENMP "Enable OpenMP acceleration" OFF)
-option(ENABLE_ZSTD "Enable Zstd compression" ON)
+option(ENABLE_ZSTD "Enable Zstd compression" OFF)
 option(BUILD_EXAMPLES "Build example programs" ON)
 
 # Zstd integration using pkg-config
@@ -83,10 +83,7 @@ if (USE_OPENMP)
 endif()
 
 if (ENABLE_ZSTD)
-    target_include_directories(MSz PRIVATE ${Zstd_INCLUDE_DIRS})
-    target_link_directories(MSz PRIVATE ${Zstd_LIBRARY_DIRS})
-    target_link_libraries(MSz PRIVATE ${Zstd_LIBRARIES})
-    target_compile_options(MSz PRIVATE ${Zstd_CFLAGS_OTHER})
+    target_link_directories(MSz PRIVATE zstd::libzstd)
 endif()
 
 # Installation configuration
@@ -108,7 +105,7 @@ install(EXPORT MSzTargets
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(
     "${CMAKE_CURRENT_BINARY_DIR}/MSzConfigVersion.cmake"
-    VERSION 1.0
+    VERSION 0.2
     COMPATIBILITY AnyNewerVersion
 )
 
