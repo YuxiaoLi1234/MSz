@@ -11,6 +11,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        ENABLE_CUDA: [ON, OFF]
+        ENABLE_OPENMP: [ON, OFF]
+        ENABLE_ZSTD: [ON, OFF]
+        BUILD_EXAMPLES: [ON, OFF]
 
     steps:
       - name: Checkout code
@@ -19,25 +25,38 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y build-essential libomp-dev
           sudo apt install -y build-essential libomp-dev zstd
 
       - name: Detect CUDA and set options
         id: detect
         run: |
-          if command -v nvcc >/dev/null 2>&1; then
+          if [[ "${{ matrix.ENABLE_CUDA }}" == "OFF" ]]; then
+            echo "CUDA disabled by matrix"
+            echo "ENABLE_CUDA=OFF" >> $GITHUB_ENV
+          elif command -v nvcc >/dev/null 2>&1; then
             echo "CUDA detected"
             echo "ENABLE_CUDA=ON" >> $GITHUB_ENV
           else
-            echo "CUDA not detected"
+            echo "CUDA requested but not found, disabling CUDA"
             echo "ENABLE_CUDA=OFF" >> $GITHUB_ENV
           fi
         shell: bash
+
 
       - name: Build project
         run: |
           mkdir build
           cd build
-          cmake .. -DENABLE_CUDA=${{ env.ENABLE_CUDA }} -DENABLE_OPENMP=ON
+          cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/my_project_install \
+                   -DENABLE_CUDA=${{ matrix.ENABLE_CUDA }} \
+                   -DENABLE_OPENMP=${{ matrix.ENABLE_OPENMP }} \
+                   -DENABLE_ZSTD=${{ matrix.ENABLE_ZSTD }} \
+                   -DBUILD_EXAMPLES=${{ matrix.BUILD_EXAMPLES }}
           make -j$(nproc)
           make install
+
+      - name: Verify installation
+        run: |
+          echo "Installation directory: $HOME/my_project_install"
+          ls -l $HOME/my_project_install/
+          ls -l $HOME/my_project_install/bin/
