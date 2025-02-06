@@ -58,9 +58,9 @@ jobs:
           mkdir build
           cd build
           cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/my_project_install \
-                   -DENABLE_CUDA=${{ env.ENABLE_CUDA }} \
-                   -DENABLE_OPENMP=${{ matrix.ENABLE_OPENMP }} \
-                   -DENABLE_ZSTD=${{ matrix.ENABLE_ZSTD }} \
+                   -DMSZ_ENABLE_CUDA=${{ env.ENABLE_CUDA }} \
+                   -DMSZ_ENABLE_OPENMP=${{ matrix.ENABLE_OPENMP }} \
+                   -DMSZ_ENABLE_ZSTD=${{ matrix.ENABLE_ZSTD }} \
                    -DBUILD_EXAMPLES=${{ matrix.BUILD_EXAMPLES }}
           make -j$(nproc)
           make install
