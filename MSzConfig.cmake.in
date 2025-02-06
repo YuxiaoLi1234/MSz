@@ -4,3 +4,6 @@ include("${CMAKE_CURRENT_LIST_DIR}/MSzTargets.cmake")
 
 set(MSz_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/${CMAKE_INSTALL_INCLUDEDIR}")
 set(MSz_LIBRARIES MSz)
+if(@MSZ_ENABLE_CUDA@)
+    enable_language(CUDA)
+endif()
