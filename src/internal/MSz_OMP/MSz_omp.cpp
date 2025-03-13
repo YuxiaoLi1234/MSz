@@ -1,3 +1,5 @@
+#ifdef MSZ_ENABLE_OPENMP
+
 #include "MSz_omp.h"
 #include "MSz_globals.h"
 #include <parallel/algorithm>  
@@ -465,3 +467,4 @@ int count_false_cases_omp(std::vector<int> *or_direction_as,std::vector<int> *or
 }
     
 
+#endif // MSZ_ENABLE_OPENMP
