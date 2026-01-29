@@ -51,6 +51,10 @@ if (BUILD_EXAMPLES)
     add_executable(ex2 examples/ex2_MSz_derive_apply_edits.cpp)
     target_link_libraries(ex2 PRIVATE MSz Threads::Threads)
     target_compile_features(ex2 PRIVATE cxx_std_17)
+    
+    add_executable(ex3 examples/ex3_MSz_zstd_omp.cpp)
+    target_link_libraries(ex3 PRIVATE MSz Threads::Threads)
+    target_compile_features(ex3 PRIVATE cxx_std_17)
 endif()
 
 # CUDA linkage
@@ -61,6 +65,7 @@ if (MSZ_ENABLE_CUDA)
     target_compile_definitions(MSz PRIVATE MSZ_ENABLE_CUDA=1)
     target_link_libraries(MSz PRIVATE CUDA::cudart)
     set_target_properties(MSz PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    set_target_properties(MSz PROPERTIES CUDA_ARCHITECTURES "native")
 endif()
 
 # OpenMP linkage
@@ -73,7 +78,15 @@ endif()
 
 if (MSZ_ENABLE_ZSTD)
     find_package(zstd REQUIRED)
-    target_link_libraries(MSz PRIVATE zstd::libzstd)
+    if(TARGET zstd::libzstd)
+        target_link_libraries(MSz PRIVATE zstd::libzstd)
+    elseif(TARGET zstd::libzstd_shared)
+        target_link_libraries(MSz PRIVATE zstd::libzstd_shared)
+    elseif(TARGET zstd::libzstd_static)
+        target_link_libraries(MSz PRIVATE zstd::libzstd_static)
+    else()
+        target_link_libraries(MSz PRIVATE zstd)
+    endif()
 endif()
 
 

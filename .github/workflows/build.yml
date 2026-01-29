@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main  
+  workflow_dispatch:
 
 jobs:
   build:
@@ -25,6 +26,7 @@ jobs:
       - name: Install CUDA Toolkit (if needed)
         if: matrix.ENABLE_CUDA == 'ON'
         run: |
+          sudo apt update
           sudo apt install -y nvidia-cuda-toolkit
           echo "/usr/local/cuda/bin" >> $GITHUB_PATH
           nvcc --version  
@@ -32,11 +34,13 @@ jobs:
       - name: Install zstd (if needed)
         if: matrix.ENABLE_ZSTD == 'ON'
         run: |
-          sudo apt install -y build-essential zstd
+          sudo apt update
+          sudo apt install -y build-essential libzstd-dev
       
       - name: Install OPENMP (if needed)
         if: matrix.ENABLE_OPENMP == 'ON'
         run: |
+          sudo apt update
           sudo apt install -y build-essential libomp-dev
 
       - name: Set CUDA flag
@@ -53,17 +57,38 @@ jobs:
           fi
         shell: bash
 
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install numpy
+
       - name: Build project
         run: |
           mkdir build
           cd build
           cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/my_project_install \
-                   -DENABLE_CUDA=${{ env.ENABLE_CUDA }} \
-                   -DENABLE_OPENMP=${{ matrix.ENABLE_OPENMP }} \
-                   -DENABLE_ZSTD=${{ matrix.ENABLE_ZSTD }} \
+                   -DBUILD_PYTHON=ON \
+                   -DMSZ_ENABLE_CUDA=${{ matrix.ENABLE_CUDA }} \
+                   -DMSZ_ENABLE_OPENMP=${{ matrix.ENABLE_OPENMP }} \
+                   -DMSZ_ENABLE_ZSTD=${{ matrix.ENABLE_ZSTD }} \
                    -DBUILD_EXAMPLES=${{ matrix.BUILD_EXAMPLES }}
           make -j$(nproc)
-          make install
+          sudo make install
+
+      - name: Run basic examples
+        if: matrix.BUILD_EXAMPLES == 'ON'
+        run: |
+          cd build
+          ./ex1
+          ./ex2
+          export LD_LIBRARY_PATH=$HOME/my_project_install/lib:$LD_LIBRARY_PATH
+          python3 ../examples/python/example_msz.py
+
+      - name: Run library test example
+        if: matrix.BUILD_EXAMPLES == 'ON' && matrix.ENABLE_CUDA == 'ON' && matrix.ENABLE_OPENMP == 'ON' && matrix.ENABLE_ZSTD == 'ON'
+        run: |
+          cd build
+          ./ex3
 
       - name: Verify installation
         run: |

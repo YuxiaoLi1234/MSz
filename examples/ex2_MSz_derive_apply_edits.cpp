@@ -120,6 +120,25 @@ int main() {
     if (status == MSZ_ERR_NO_ERROR) {
         std::cerr << "Successfully applied edits!" << std::endl;
         free(edits);  // Free the allocated memory for edits
+
+        // Verify faults after edits
+        int num_false_min_after = 0, num_false_max_after = 0, num_false_labels_after = 0;
+        status = MSz_count_faults(
+            original_data.data(),
+            decompressed_data.data(),
+            num_false_min_after, num_false_max_after,
+            num_false_labels_after,
+            0,
+            width, height, depth,
+            MSZ_ACCELERATOR_NONE
+        );
+
+        if (status == MSZ_ERR_NO_ERROR) {
+            std::cout << "\nFaults count after edits:" << std::endl;
+            std::cout << "Number of false minima: " << num_false_min_after << std::endl;
+            std::cout << "Number of false maxima: " << num_false_max_after << std::endl;
+            std::cout << "Number of false labels: " << num_false_labels_after << std::endl;
+        }
     } else {
         std::cerr << "Error: Failed to apply edits. Error code: " << status << std::endl;
     }
