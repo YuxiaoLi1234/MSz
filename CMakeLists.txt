@@ -19,6 +19,10 @@ add_library(MSz
 configure_file(src/internal/msz_config.h.in ${CMAKE_BINARY_DIR}/include/MSz_config.h)
 target_compile_features(MSz PRIVATE cxx_std_17)
 
+if(UNIX AND NOT APPLE)
+    target_link_options(MSz PUBLIC "-static-libstdc++" "-static-libgcc")
+endif()
+
 target_include_directories(MSz PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>   
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>   
@@ -114,3 +118,35 @@ install(FILES
 
 install(TARGETS MSz_CLI
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# Python bindings
+option(BUILD_PYTHON "Build Python bindings" ON)
+if (BUILD_PYTHON)
+    include(FetchContent)
+    FetchContent_Declare(
+      pybind11
+      GIT_REPOSITORY https://github.com/pybind/pybind11.git
+      GIT_TAG        v2.11.1
+    )
+    FetchContent_MakeAvailable(pybind11)
+
+    pybind11_add_module(msz src/python/msz_py.cpp)
+    target_link_libraries(msz PRIVATE MSz)
+    
+    # Statically link libstdc++ and libgcc to avoid version conflicts in environments like Conda
+    if(UNIX AND NOT APPLE)
+        target_link_options(msz PRIVATE "-static-libstdc++" "-static-libgcc")
+    endif()
+
+    # Set output directory for the python module to the project root or build dir
+    set_target_properties(msz PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+    # Installation rules for Python module
+    find_package(Python3 COMPONENTS Interpreter Development)
+    if(Python3_FOUND)
+        install(TARGETS msz DESTINATION ${Python3_SITELIB})
+        message(STATUS "Python module msz will be installed to: ${Python3_SITELIB}")
+    else()
+        install(TARGETS msz DESTINATION ${CMAKE_INSTALL_LIBDIR}/python)
+    endif()
+endif()

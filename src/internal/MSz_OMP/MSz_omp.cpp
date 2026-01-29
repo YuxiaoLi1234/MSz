@@ -1,3 +1,4 @@
+#include "MSz_config.h"
 #ifdef MSZ_ENABLE_OPENMP
 
 #include "MSz_omp.h"
