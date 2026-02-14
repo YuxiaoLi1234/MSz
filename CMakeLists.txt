@@ -4,7 +4,7 @@ project(MSz LANGUAGES CXX C VERSION 0.0.2)
 
 include(GNUInstallDirs)
 
-option(MSZ_ENABLE_CUDA "Enable CUDA acceleration" ON)
+option(MSZ_ENABLE_CUDA "Enable CUDA acceleration" OFF)
 option(MSZ_ENABLE_OPENMP "Enable OpenMP acceleration" OFF)
 option(MSZ_ENABLE_ZSTD "Enable Zstd compression" OFF)
 option(BUILD_EXAMPLES "Build example programs" ON)
