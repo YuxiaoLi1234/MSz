@@ -66,16 +66,16 @@ bool read_binary_file(const std::string& file_path, std::vector<double>& data, s
 int main() {
     // Variables to store the data
     std::vector<double> original_data, decompressed_data;
-    int width = 100, height = 100, depth = 1;  // Dimensions of the 2D grid (set depth to 1 for 2D)
+    int width = 177, height = 95, depth = 48;  // Dimensions of the 2D grid (set depth to 1 for 2D)
     int num_elements = width * height * depth; // Total number of elements in the grid
 
     // Read the original dataset from a binary file
-    if (!read_binary_file("../examples/datasets/grid100x100.bin", original_data, num_elements)) {
+    if (!read_binary_file("/pscratch/sd/y/yuxiaoli/datasets/at.bin", original_data, num_elements)) {
         return -1;  // Exit if file reading fails
     }
 
     // Read the decompressed dataset from a binary file
-    if (!read_binary_file("../examples/datasets/decp_grid100x100_sz3_rel_1e-4.bin", decompressed_data, num_elements)) {
+    if (!read_binary_file("/pscratch/sd/y/yuxiaoli/datasets/decp_at_sz3_0.000100.bin", decompressed_data, num_elements)) {
         return -1;  // Exit if file reading fails
     }
 
@@ -90,7 +90,7 @@ int main() {
         num_false_labels,              // Output: number of false labels
         0,                             // Connectivity type (0 for piecewise linear)
         width, height, depth,          // Dimensions of the grid
-        MSZ_ACCELERATOR_NONE           // Use pure CPU execution
+        MSZ_ACCELERATOR_CUDA           // Use pure CPU execution
     );
 
     // Check the status returned by the API

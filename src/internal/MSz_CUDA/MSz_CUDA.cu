@@ -24,27 +24,17 @@
 #include <chrono>
 #include <thrust/device_vector.h>
 
-
+ 
 
 
 
 __device__ double* decp_data;
 __device__ double* decp_data_copy ;
-__device__ int directions1[78] = {
-    1, 0, 0, -1, 0, 0,   
-    0, 1, 0, 0, -1, 0,
-    0, 0, 1, 0, 0, -1,
-    1, 1, 0, 1, -1, 0,  
-    -1, 1, 0, -1, -1, 0,
-    1, 0, 1, 1, 0, -1,
-    -1, 0, 1, -1, 0, -1,
-    0, 1, 1, 0, 1, -1,
-    0, -1, 1, 0, -1, -1,
-    1, 1, 1, 1, 1, -1,  
-    1, -1, 1, 1, -1, -1,
-    -1, 1, 1, -1, 1, -1,
-    -1, -1, 1, -1, -1, -1
-};
+__device__ int directions1[78] = {1, 0, 0, -1, 0, 0, 0, 1, 0, 0, -1, 0,
+ 0, 0, 1, 0, 0, -1, -1, 1, 0, 1, -1, 0, 
+0, 1, 1, 0, -1, -1, -1, 0, 1, 1, 0, -1,
+-1, 1, 1, 1, -1, -1, 0, -1, 1, 0, 1, -1, 1, 1, 0, -1, -1, 0,
+1, 0, 1, -1, 0, -1, 1, 1, 1, 1, 1, -1, 1, -1, 1, -1, 1, -1 , -1, -1, 1, -1, -1, -1};
 
 __device__ int width;
 __device__ int height;
@@ -65,7 +55,8 @@ __device__ int count_f_min;
 __device__ int count_p_max;
 __device__ int count_p_min;
 __device__ int count_false_label;
-__device__ int* maxi;
+__device__ int* maxi, *edits;
+__device__ uint8_t *delta_counter;
 
 __device__ double bound;
 __device__ int edit_count;
@@ -79,24 +70,19 @@ __device__ int* dec_label;
 __device__ double* input_data;
 __device__ int* de_direction_as;
 __device__ int* de_direction_ds;
-__device__ int maxNeighbors = 12;
+__device__ int maxNeighbors = 14;
 
 __device__ int direction_to_index_mapping_cuda[26][3] = 
 {
-    {1, 0, 0}, {-1, 0, 0},   
-    {0, 1, 0}, {0, -1, 0},
-    {0, 0, 1}, {0, 0, -1},
-    {1, 1, 0}, {1, -1, 0},  
-    {-1, 1, 0}, {-1, -1, 0},
-    {1, 0, 1}, {1, 0, -1},
-    {-1, 0, 1}, {-1, 0, -1},
-    {0, 1, 1}, {0, 1, -1},
-    {0, -1, 1}, {0, -1, -1},
-    {1, 1, 1}, {1, 1, -1},  
-    {1, -1, 1}, {1, -1, -1},
-    {-1, 1, 1}, {-1, 1, -1},
-    {-1, -1, 1}, {-1, -1, -1}
+    {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0},
+    {0, 0, 1}, {0, 0, -1}, {-1, 1, 0}, {1, -1, 0}, 
+    {0, 1, 1}, {0, -1, -1}, {-1, 0, 1}, {1, 0, -1},
+    {-1, 1, 1},{1, -1, -1},
+    {0, -1, 1}, {0, 1, -1},{1, 1, 0}, {-1, -1, 0},
+    {1, 0, 1}, {-1, 0, -1},{1, 1, 1}, {1, 1, -1},  
+    {1, -1, 1}, {-1, 1, -1},{-1, -1, 1}, {-1, -1, -1}
 };   
+
 
 
 __device__ int getDirection_cuda(int x, int y, int z){
@@ -366,28 +352,42 @@ __device__ double atomicCASDouble(double* address, double val) {
     return __longlong_as_double(old_val_as_ull);
 }
 
-__device__ int swap(int index, double delta){
-    int update_successful = 0;
+template <typename T>
+__device__ void applyDeltaBuffer_local(uint8_t *delta_counter, T delta, int q, 
+    size_t tid) {
     
-    while (update_successful==0) {
-        double current_value = d_deltaBuffer[index];
-        if (-delta > current_value) {
-            double swapped = atomicCASDouble(&d_deltaBuffer[index], delta);
-            if (swapped == current_value) {
-                update_successful = 1;
-                
-            } 
-        } else {
-            update_successful = 1; 
-        }
+    if(fabs(input_data[tid]-(decp_data[tid] - delta)) < bound && delta_counter[tid] < q - 1){
+        
+        decp_data[tid] -= delta; 
+        delta_counter[tid] += 1;
+    }
+    else{
+        delta_counter[tid] = q;
+        decp_data[tid] = input_data[tid] - bound;
     }
 }
 
-__global__ void fix_maxi_critical(int direction, int cnt){
+// __device__ int swap(int index, double delta){
+//     int update_successful = 0;
+    
+//     while (update_successful==0) {
+//         double current_value = d_deltaBuffer[index];
+//         if (-delta > current_value) {
+//             double swapped = atomicCASDouble(&d_deltaBuffer[index], delta);
+//             if (swapped == current_value) {
+//                 update_successful = 1;
+                
+//             } 
+//         } else {
+//             update_successful = 1; 
+//         }
+//     }
+// }
+
+__global__ void fix_maxi_critical(int direction, int cnt, double delta, int q){
     int index_f = blockIdx.x * blockDim.x + threadIdx.x;
         
     int index;
-    int next_vertex;
 
     if (direction == 0 && index_f<count_f_max){
         
@@ -395,44 +395,33 @@ __global__ void fix_maxi_critical(int direction, int cnt){
         // if vertex is a regular point.
         if (or_maxi[index]!=-1){
             
-            // find its largest neighbor
-            
-            next_vertex = from_direction_to_index(index,or_maxi[index]);
-            
-            double d = ((input_data[index] - bound) + decp_data[index]) / 2.0 - decp_data[index];
-            
-            if(decp_data[index]<decp_data[next_vertex] or (decp_data[index]==decp_data[next_vertex] and index<next_vertex)){
-                return;
+            if (atomicCAS(&edits[index], 0, 1) == 0){         
+                applyDeltaBuffer_local<double>(delta_counter, delta, q, 
+                                                index);
             }
 
-            
-            double oldValue = d_deltaBuffer[index];
-            
-            if (d > oldValue) {
-                swap(index, d);
-            }  
-
             return;
-            
-            
-            
-        
+
         }
         else{
             // if is a maximum in the original data;
             
             int largest_index = from_direction_to_index(index, de_direction_as[index]);
             
-            if(decp_data[index]>decp_data[largest_index] or(decp_data[index]==decp_data[largest_index] and index>largest_index)){
-                return;
-            }
+            // if(decp_data[index]>decp_data[largest_index] or(decp_data[index]==decp_data[largest_index] and index>largest_index)){
+            //     return;
+            // }
 
-            double d = ((input_data[largest_index] - bound) + decp_data[largest_index]) / 2.0 - decp_data[largest_index];
+            // double d = ((input_data[largest_index] - bound) + decp_data[largest_index]) / 2.0 - decp_data[largest_index];
             
-            double oldValue = d_deltaBuffer[largest_index];
-            if (d > oldValue) {
-                swap(largest_index, d);
-            }  
+            // double oldValue = d_deltaBuffer[largest_index];
+            // if (d > oldValue) {
+            //     swap(largest_index, d);
+            // }  
+            if (atomicCAS(&edits[largest_index], 0, 1) == 0){         
+                applyDeltaBuffer_local<double>(delta_counter, delta, q, 
+                                                largest_index);
+            }
 
             return;
         }
@@ -445,42 +434,33 @@ __global__ void fix_maxi_critical(int direction, int cnt){
         index = all_min[index_f];
         
         if (or_mini[index]!=-1){
-           
-            
             int next_vertex= from_direction_to_index(index,or_mini[index]);
-            
-
-            double d = ((input_data[next_vertex] - bound) + decp_data[index]) / 2.0 - decp_data[next_vertex];
-            
-            if(decp_data[index]>decp_data[next_vertex] or (decp_data[index]==decp_data[next_vertex] and index>next_vertex)){
-                return;
+            // double d = ((input_data[next_vertex] - bound) + decp_data[next_vertex]) / 2.0 - decp_data[next_vertex];
+            // double oldValue = d_deltaBuffer[next_vertex];
+            // if (d > oldValue) {
+            //     swap(next_vertex, d);
+            // }  
+            // return;
+            if (atomicCAS(&edits[next_vertex], 0, 1) == 0){         
+                applyDeltaBuffer_local<double>(delta_counter, delta, q, 
+                                                next_vertex);
             }
-
-            double oldValue = d_deltaBuffer[next_vertex];
-            if (d > oldValue) {
-                swap(next_vertex, d);
-            }  
-
-            return;
        
         
         }
     
         else{
             
-            int largest_index = from_direction_to_index(index,de_direction_ds[index]);
+            // double d = ((input_data[index] - bound) + decp_data[index]) / 2.0 - decp_data[index];
             
-            if(decp_data[index]<decp_data[largest_index] or (decp_data[index]==decp_data[largest_index] and index<largest_index)){
-                
-                return;
+            // double oldValue = d_deltaBuffer[index];
+            // if (d > oldValue) {
+            //     swap(index, d);
+            // }  
+            if (atomicCAS(&edits[index], 0, 1) == 0){         
+                applyDeltaBuffer_local<double>(delta_counter, delta, q, 
+                                                index);
             }
-            
-            double d = ((input_data[index] - bound) + decp_data[index]) / 2.0 - decp_data[index];
-            
-            double oldValue = d_deltaBuffer[index];
-            if (d > oldValue) {
-                swap(index, d);
-            }  
 
             return; 
         }
@@ -503,7 +483,13 @@ __global__ void initializeKernel(double value) {
 
 }
 
-__global__ void fixpath(int direction){
+__global__ void init_edits(){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if(i>=num) return;
+    edits[i] = 0;
+}
+
+__global__ void fixpath(int direction, double delta, int q){
     int index_f = blockIdx.x * blockDim.x + threadIdx.x;
     
     if(direction == 0){
@@ -537,12 +523,16 @@ __global__ void fixpath(int direction){
             int true_index= from_direction_to_index(cur, or_maxi[cur]);
             if(false_index==true_index) return;
 
-            double d = ((input_data[false_index] - bound) + decp_data[false_index]) / 2.0 - decp_data[false_index];
+            // double d = ((input_data[false_index] - bound) + decp_data[false_index]) / 2.0 - decp_data[false_index];
              
-            double oldValue = d_deltaBuffer[false_index];
-            if (d > oldValue) {
-                swap(false_index, d);
-            }  
+            // double oldValue = d_deltaBuffer[false_index];
+            // if (d > oldValue) {
+            //     swap(false_index, d);
+            // }  
+            if (atomicCAS(&edits[false_index], 0, 1) == 0){         
+                applyDeltaBuffer_local<double>(delta_counter, delta, q, 
+                                                false_index);
+            }
 
             return;
         }
@@ -582,11 +572,15 @@ __global__ void fixpath(int direction){
             int true_index= from_direction_to_index(cur, or_mini[cur]);
             if(false_index==true_index) return;
 
-            double d = ((input_data[true_index] - bound) + decp_data[true_index]) / 2.0 - decp_data[true_index];
-            double oldValue = d_deltaBuffer[true_index];
-            if (d > oldValue) {
-                swap(true_index, d);
-            }  
+            // double d = ((input_data[true_index] - bound) + decp_data[true_index]) / 2.0 - decp_data[true_index];
+            // double oldValue = d_deltaBuffer[true_index];
+            // if (d > oldValue) {
+            //     swap(true_index, d);
+            // }  
+            if (atomicCAS(&edits[true_index], 0, 1) == 0){         
+                applyDeltaBuffer_local<double>(delta_counter, delta, q, 
+                                                true_index);
+            }
 
             return;
         }
@@ -595,13 +589,15 @@ __global__ void fixpath(int direction){
     return;
 };
 
+
+
 __global__ void applyDeltaBuffer_cuda() {
     int tid = blockIdx.x * blockDim.x + threadIdx.x;
     
     if (tid < num) {
-        if(d_deltaBuffer[tid] > -4.0 * bound){
+        if(d_deltaBuffer[tid] != -4.0 * bound){
             
-            if(abs(d_deltaBuffer[tid]) > 1e-15) decp_data[tid] += d_deltaBuffer[tid];
+            if(abs(d_deltaBuffer[tid]) > 1e-10) decp_data[tid] += d_deltaBuffer[tid];
             else decp_data[tid] = input_data[tid] - bound;
         }
 
@@ -758,7 +754,7 @@ __global__ void change_mode(int neighbor_number)
 __global__ void apply_edits_kernel(double *d_data, const MSz_edit_t *d_edits, int num_edits) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i < num_edits) {
-        int index = d_edits[i].index;
+        uint32_t index = d_edits[i].index;
         double offset = d_edits[i].offset;
         d_data[index] += offset;
     }
@@ -782,14 +778,14 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
     int *temp, *temp1, *d_data, *or_l, *dec_l;
     
     double *temp3, *temp4;
-    int max_n = 12;
+    int max_n = 14;
     if(neighbor_number!=0) max_n = 26;
     int num1 = width1*height1*depth1;
     
     int h_un_sign_as = num1;
     int h_un_sign_ds = num1;
 
-    
+    int q = 5;
     int *un_sign_as;
     cudaMalloc((void**)&un_sign_as, sizeof(int));
     cudaMemset(un_sign_as, 0, sizeof(int));
@@ -922,11 +918,20 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
     cudaMemcpyToSymbol(de_direction_ds, &d_temp3, sizeof(int*));
     cudaMemcpyToSymbol(or_maxi, &temp, sizeof(int*));
     cudaMemcpyToSymbol(or_mini, &temp1, sizeof(int*));
+    
     cudaMemcpyToSymbol(input_data, &temp3, sizeof(double*));
     cudaMemcpyToSymbol(decp_data, &temp4, sizeof(double*));
 
+    uint8_t *delta_counter_host;
+    cudaMalloc(&delta_counter_host, num1  * sizeof(uint8_t));
+    cudaMemset(delta_counter_host, 0,  num1 * sizeof(uint8_t));
+    cudaMemcpyToSymbol(delta_counter, &delta_counter_host, sizeof(uint8_t*));
     
-    
+    int *edits_host;
+    cudaMalloc(&edits_host, num1 * sizeof(int));
+    cudaMemset(edits_host, 0,  num1 * sizeof(int));
+    cudaMemcpyToSymbol(edits, &edits_host, sizeof(int*));
+
     dim3 blockSize(256);
     dim3 gridSize((num1 + blockSize.x - 1) / blockSize.x);
     
@@ -943,9 +948,9 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
     computeAdjacency<<<gridSize, blockSize>>>();
     cudaDeviceSynchronize();
     find_direction<<<gridSize, blockSize>>>(1);
+    cudaDeviceSynchronize();
     
-    
-    
+    double delta = bound1/q;
 
     double init_value = -2*bound1;
     double* buffer_temp;
@@ -988,11 +993,8 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
     if(preserve_max == 0) host_count_f_max = 0;
     if(preserve_min == 0) host_count_f_min = 0;
     
-    
     while(host_count_f_min>0 || host_count_f_max>0){
-            
-            
-            initializeKernel<<<gridSize, blockSize>>>(init_value);
+            init_edits<<<gridSize, blockSize>>>();
             
             cudaDeviceSynchronize();
             
@@ -1001,14 +1003,14 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
             
             if(preserve_max == 1)
             {
-                fix_maxi_critical<<<gridSize1, blockSize1>>>(0,cnt);
+                fix_maxi_critical<<<gridSize1, blockSize1>>>(0,cnt, delta, q);
             }   
 
             dim3 blocknum(256);
             dim3 gridnum((host_count_f_min + blocknum.x - 1) / blocknum.x);
             if(preserve_min == 1)
             {
-                fix_maxi_critical<<<gridnum, blocknum>>>(1,cnt);
+                fix_maxi_critical<<<gridnum, blocknum>>>(1,cnt, delta, q);
             }
             
             applyDeltaBuffer_cuda<<<gridSize, blockSize>>>();
@@ -1019,8 +1021,9 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
             cudaDeviceSynchronize();
             
             iscriticle<<<gridSize, blockSize>>>();
+            cudaDeviceSynchronize();
             find_direction<<<gridSize,blockSize>>>();
-
+            cudaDeviceSynchronize();
             cudaMemcpyFromSymbol(&host_count_f_max, count_f_max, sizeof(int), 0, cudaMemcpyDeviceToHost);
             cudaMemcpyFromSymbol(&host_count_f_min, count_f_min, sizeof(int), 0, cudaMemcpyDeviceToHost);
             
@@ -1029,11 +1032,11 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
             if(preserve_min == 0) host_count_f_min = 0;
             
     }
-
     
     if(preserve_path ==0 || preserve_max == 0 || preserve_min == 0) 
     {
         cudaMemcpy(decp_data1->data(), temp4, num1 * sizeof(double), cudaMemcpyDeviceToHost);
+        cudaDeviceSynchronize();
         return MSZ_ERR_NO_ERROR;
     }
     
@@ -1103,20 +1106,16 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
         
     
 
-        initializeKernel<<<gridSize, blockSize>>>(init_value);
+        init_edits<<<gridSize, blockSize>>>();
         dim3 blockSize2(256);
         dim3 gridSize2((host_count_p_max + blockSize2.x - 1) / blockSize2.x);
 
-
-        
-        fixpath<<<gridSize2, blockSize2>>>(0);
+        fixpath<<<gridSize2, blockSize2>>>(0, delta, q);
         cudaDeviceSynchronize();
-        
-        
-        
+
         dim3 blockSize3(256);
         dim3 gridSize3((host_count_p_min + blockSize3.x - 1) / blockSize3.x);
-        fixpath<<<gridSize3, blockSize3>>>(1);
+        fixpath<<<gridSize3, blockSize3>>>(1, delta, q);
         cudaDeviceSynchronize();
 
         applyDeltaBuffer_cuda<<<gridSize, blockSize>>>();
@@ -1140,9 +1139,9 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
             dim3 blockSize1(256);
             dim3 gridSize1((host_count_f_max + blockSize1.x - 1) / blockSize1.x);
             
-            initializeKernel<<<gridSize, blockSize>>>(init_value);
+            init_edits<<<gridSize, blockSize>>>();
             
-            fix_maxi_critical<<<gridSize1, blockSize1>>>(0,cnt);
+            fix_maxi_critical<<<gridSize1, blockSize1>>>(0,cnt, delta, q);
             
             cudaDeviceSynchronize();
             // cudaDeviceSynchronize();
@@ -1151,7 +1150,7 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
             dim3 blocknum(256);
             dim3 gridnum((host_count_f_min + blocknum.x - 1) / blocknum.x);
             
-            fix_maxi_critical<<<gridnum, blocknum>>>(1,cnt);
+            fix_maxi_critical<<<gridnum, blocknum>>>(1,cnt, delta, q);
             cudaDeviceSynchronize();
             
             
@@ -1173,7 +1172,7 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
         }
         
         initializeWithIndex_cuda<<<gridSize, blockSize>>>(num1,0);
-        
+        cudaDeviceSynchronize();
         h_un_sign_as = num1;
         h_un_sign_ds = num1;
         
@@ -1200,7 +1199,7 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
 
         
         get_wrong_index_path<<<gridSize, blockSize>>>();
-    
+        cudaDeviceSynchronize();
 
         cudaMemcpyFromSymbol(&host_count_p_max, count_p_max, sizeof(int), 0, cudaMemcpyDeviceToHost);
         
@@ -1208,16 +1207,14 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
         
         cudaMemcpyToSymbol(count_f_max, &initialValue, sizeof(int));
         cudaMemcpyToSymbol(count_f_min, &initialValue, sizeof(int));
-
+        cudaDeviceSynchronize();
         
         iscriticle<<<gridSize, blockSize>>>();
-        
-
+        cudaDeviceSynchronize();
 
         cudaMemcpyFromSymbol(&host_count_f_max, count_f_max, sizeof(int), 0, cudaMemcpyDeviceToHost);
-    
         cudaMemcpyFromSymbol(&host_count_f_min, count_f_min, sizeof(int), 0, cudaMemcpyDeviceToHost);
-        
+        cudaDeviceSynchronize();
     
     }
     
@@ -1229,7 +1226,7 @@ int fix_process(std::vector<int> *a,std::vector<int> *b,
     cudaMemcpy(c->data(), d_temp2, num1 * sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(d->data(), d_temp3, num1 * sizeof(int), cudaMemcpyDeviceToHost);
     cudaMemcpy(decp_data1->data(), temp4, num1 * sizeof(double), cudaMemcpyDeviceToHost);
-    
+    cudaDeviceSynchronize();
 
     return MSZ_ERR_NO_ERROR;
 }
@@ -1247,7 +1244,7 @@ int count_false_cases(std::vector<int> *a,std::vector<int> *b,
     }
     int *temp, *temp1, *d_data, *or_l, *dec_l;
     double *temp3, *temp4;
-    int max_n = 12;
+    int max_n = 14;
     if(neighbor_number!=0) max_n = 26;
     int num1 = width1*height1*depth1;
     
@@ -1405,7 +1402,7 @@ int count_false_cases(std::vector<int> *a,std::vector<int> *b,
     cudaDeviceSynchronize();
 
     find_direction<<<gridSize, blockSize>>>(1);
-    
+    cudaDeviceSynchronize();
     double* buffer_temp;
     cudaStatus = cudaMalloc(&buffer_temp, num1  * sizeof(double));
     if (cudaStatus != cudaSuccess) {
@@ -1423,7 +1420,7 @@ int count_false_cases(std::vector<int> *a,std::vector<int> *b,
     cudaMemcpyToSymbol(id_array, &array_temp, sizeof(int*));
 
     find_direction<<<gridSize, blockSize>>>();
-    
+    cudaDeviceSynchronize();
 
     
     int initialValue = 0;
@@ -1431,7 +1428,7 @@ int count_false_cases(std::vector<int> *a,std::vector<int> *b,
     cudaMemcpyToSymbol(count_f_min, &initialValue, sizeof(int));
     iscriticle<<<gridSize,blockSize>>>();
     
-    
+    cudaDeviceSynchronize();
     
     cudaMemcpyFromSymbol(&wrong_max, count_f_max, sizeof(int), 0, cudaMemcpyDeviceToHost);
     cudaMemcpyFromSymbol(&wrong_min, count_f_min, sizeof(int), 0, cudaMemcpyDeviceToHost);
@@ -1478,10 +1475,10 @@ int count_false_cases(std::vector<int> *a,std::vector<int> *b,
     cudaMemcpyToSymbol(count_p_max, &initialValue, sizeof(int));
     cudaMemcpyToSymbol(count_p_min, &initialValue, sizeof(int));
     get_wrong_index_count<<<gridSize, blockSize>>>();
-
+    cudaDeviceSynchronize();
     
     cudaMemcpyFromSymbol(&wrong_labels, count_false_label, sizeof(int), 0, cudaMemcpyDeviceToHost);
-    
+    cudaDeviceSynchronize();
     
     return MSZ_ERR_NO_ERROR;
 }
@@ -1492,8 +1489,7 @@ int MSz_apply_edits_cuda(
     const MSz_edit_t *edits,       // Input: array of edits
     int W, int H, int D,           // Input: dimensions of the data
     int accelerator,               // Input: hardware accelerator
-    int device_id,                 // Input: GPU device ID (if using CUDA)
-    int num_omp_threads            // Input: number of threads (if using OpenMP)
+    int device_id                 // Input: GPU device ID (if using CUDA)
     ) {
     
     if (!decompressed_data || !edits || num_edits <= 0 || W <= 0 || H <= 0 || D <= 0) {
@@ -1525,7 +1521,7 @@ int MSz_apply_edits_cuda(
     int grid_size = (num_edits + block_size - 1) / block_size;
     apply_edits_kernel<<<grid_size, block_size>>>(d_data, d_edits, num_edits);
 
-
+    cudaDeviceSynchronize();
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         cudaFree(d_data);
@@ -1535,8 +1531,7 @@ int MSz_apply_edits_cuda(
 
     
     cudaMemcpy(decompressed_data, d_data, total_size * sizeof(double), cudaMemcpyDeviceToHost);
-
-    
+    cudaDeviceSynchronize();
     cudaFree(d_data);
     cudaFree(d_edits);
 

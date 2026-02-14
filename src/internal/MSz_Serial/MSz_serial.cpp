@@ -249,7 +249,7 @@ int fix_process_cpu(std::vector<int> *or_direction_as,std::vector<int> *or_direc
     std::vector<int> adjacency, false_max, false_min;
     std::atomic<int>* id_array = new std::atomic<int>[data_size];
 
-    int maxNeighbors = neighbor_number == 1?26:12;
+    int maxNeighbors = neighbor_number == 1?26:14;
     d_deltaBuffer.resize(data_size,-4.0 * bound);
     
     adjacency.resize(data_size*maxNeighbors, -1);
@@ -400,7 +400,7 @@ int count_false_cases_cpu(std::vector<int> *or_direction_as,std::vector<int> *or
     std::vector<int> adjacency, false_max, false_min;
     std::atomic<int>* id_array = new std::atomic<int>[data_size];
 
-    int maxNeighbors = neighbor_number == 1?26:12;
+    int maxNeighbors = neighbor_number == 1?26:14;
     
     adjacency.resize(data_size*maxNeighbors, -1);
     false_max.resize(data_size);

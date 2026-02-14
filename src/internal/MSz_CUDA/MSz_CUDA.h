@@ -6,9 +6,6 @@
 #include "api/MSz.h"
 
 
-
-
-
 /**
 * @brief Apply edits using CUDA acceleration.
 *
@@ -24,6 +21,7 @@ int MSz_apply_edits_cuda(
     int num_edits,
     const MSz_edit_t *edits,
     int W, int H, int D,
+    int accelerator,
     int device_id
 );
 

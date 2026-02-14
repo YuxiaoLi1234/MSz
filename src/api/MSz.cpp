@@ -21,11 +21,11 @@
 #include <random>
 #include <cstdio>
 
-#ifdef ENABLE_ZSTD
+#ifdef MSZ_ENABLE_ZSTD
     #include <zstd.h>
 #endif
 
-#ifdef OPENMP_ENABLED
+#ifdef MSZ_ENABLE_OPENMP
     #include <omp.h>
     #include "MSz_omp.h"
 #endif
@@ -33,7 +33,7 @@
 #include "MSz_serial.h"
 #include "MSz_globals.h"
 
-#ifdef CUDA_ENABLED
+#ifdef MSZ_ENABLE_CUDA
     #include "device_launch_parameters.h"
     #include "cuda_runtime.h"
     #include "cublas_v2.h"
@@ -57,14 +57,18 @@ int MSz_derive_edits(
         int num_omp_threads) {
 
     if (!original_data || !decompressed_data || W <= 0 || H <= 0 || D <= 0) {
+        printf("file failed\n");
         return MSZ_ERR_INVALID_INPUT;
     }
 
-    if(connectivity_type != 0 && connectivity_type != 1) return MSZ_ERR_INVALID_CONNECTIVITY_TYPE;
+    if(connectivity_type != 0 && connectivity_type != 1) {
+        printf("MSZ_ERR_INVALID_CONNECTIVITY_TYPE failed\n");
+        return MSZ_ERR_INVALID_CONNECTIVITY_TYPE;
+    }
 
     std::vector<double> input_data(original_data, original_data+W*H*D);
     std::vector<double> decp_data_(decompressed_data, decompressed_data+W*H*D);
-    std::vector<double> decp_data_copy(decp_data_);
+    std::vector<double> decp_data_copy(decompressed_data, decompressed_data+W*H*D);
 
     
     int preserve_min = 0; // Flag for preserving minima
@@ -116,16 +120,16 @@ int MSz_derive_edits(
     int status = MSZ_ERR_NO_ERROR;
 
     if (accelerator == MSZ_ACCELERATOR_CUDA) {
-        #ifdef CUDA_ENABLED
-                status = fix_process(dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_m, dev_q,
-                                    W, H, D, bound, preserve_min, preserve_max, preserve_path, connectivity_type,
-                                    device_id);
+        #ifdef MSZ_ENABLE_CUDA
+            status = fix_process(dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_m, dev_q,
+                                W, H, D, bound, preserve_min, preserve_max, preserve_path, connectivity_type,
+                                device_id);
         #else
-                return MSZ_ERR_NOT_IMPLEMENTED;
+            return MSZ_ERR_NOT_IMPLEMENTED;
         #endif
     } 
     else if (accelerator == MSZ_ACCELERATOR_OMP) {
-        #ifdef OPENMP_ENABLED
+        #ifdef MSZ_ENABLE_OPENMP
                 if (num_omp_threads <= 0) {
                     return MSZ_ERR_INVALID_THREAD_COUNT;
                 }
@@ -154,9 +158,9 @@ int MSz_derive_edits(
     
     for (uint32_t i=0;i<input_data.size();i++){
         
-        if (decp_data_copy[i]!=decp_data_[i]){
+        if (decp_data_copy[i]!=decompressed_data[i]){
             indexs.push_back(i);
-            deltas.push_back(decp_data_copy[i] - decp_data_[i]);
+            deltas.push_back(decp_data_copy[i] - decompressed_data[i]);
         }
     }
 
@@ -178,7 +182,7 @@ int MSz_derive_edits(
 
     // Populate the edits array
     
-    for (int i = 0; i < num_edits; ++i) {
+    for (int i = 0; i < num_edits; i++) {
         (*edits)[i].index = indexs[i];
         (*edits)[i].offset = deltas[i];
     }
@@ -186,10 +190,7 @@ int MSz_derive_edits(
 
     // Optional: Apply edits to the decompressed data
     if (edited_decompressed_data) {
-        std::copy(decompressed_data, decompressed_data + data_size, edited_decompressed_data);
-        for (int i = 0; i < num_edits; ++i) {
-            edited_decompressed_data[(*edits)[i].index] += (*edits)[i].offset;
-        }
+        std::copy(decp_data_copy.begin(), decp_data_copy.end(), edited_decompressed_data);
     }
 
     return MSZ_ERR_NO_ERROR;
@@ -238,7 +239,7 @@ int MSz_count_faults(
     int status = MSZ_ERR_NOT_IMPLEMENTED;
 
     if (accelerator == MSZ_ACCELERATOR_CUDA) {
-        #ifdef CUDA_ENABLED
+        #ifdef MSZ_ENABLE_CUDA
                 status = count_false_cases(
                     dev_a, dev_b, dev_c, dev_d, dev_e, dev_f, dev_m, dev_q,
                     W, H, D, connectivity_type,
@@ -249,7 +250,7 @@ int MSz_count_faults(
                 return MSZ_ERR_NOT_IMPLEMENTED;
         #endif
     } else if (accelerator == MSZ_ACCELERATOR_OMP) {
-        #ifdef OPENMP_ENABLED
+        #ifdef MSZ_ENABLE_OPENMP
                 if (num_omp_threads <= 0) {
                     return MSZ_ERR_INVALID_THREAD_COUNT;
                 }
@@ -285,7 +286,7 @@ int MSz_compress_edits_zstd(
     char **compressed_buffer,
     size_t &compressed_size) {
 
-    #ifndef ENABLE_ZSTD
+    #ifndef MSZ_ENABLE_ZSTD
         return MSZ_ERR_NOT_IMPLEMENTED; // Zstd disabled
     #else
 
@@ -371,7 +372,7 @@ int MSz_decompress_edits_zstd(
     int &num_edits,
     MSz_edit_t **edits) {
 
-    #ifndef ENABLE_ZSTD
+    #ifndef MSZ_ENABLE_ZSTD
         return MSZ_ERR_NOT_IMPLEMENTED; // Zstd disabled
     #else
         if (compressed_buffer == nullptr || compressed_size == 0 || edits == nullptr) {
@@ -469,7 +470,7 @@ int MSz_apply_edits(
         }
     }
     else if (accelerator == MSZ_ACCELERATOR_OMP) {
-        #ifdef OPENMP_ENABLED
+        #ifdef MSZ_ENABLE_OPENMP
 
         #pragma omp parallel for num_threads(num_omp_threads)
         for (int i = 0; i < num_edits; ++i) {
@@ -482,8 +483,12 @@ int MSz_apply_edits(
             return MSZ_ERR_NOT_IMPLEMENTED;
         #endif
     }
+
     else if (accelerator == MSZ_ACCELERATOR_CUDA) {
-        #ifdef CUDA_ENABLED
+        #ifdef MSZ_ENABLE_CUDA
+            MSz_apply_edits_cuda(decompressed_data,
+                                 num_edits, 
+                                 edits, W, H,D, accelerator, device_id);
             return 0;
         #else
             return MSZ_ERR_NOT_IMPLEMENTED;
