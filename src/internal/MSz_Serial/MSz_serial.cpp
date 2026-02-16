@@ -217,6 +217,159 @@ void get_false_criticle_points_cpu
 
 }
 
+int extract_critical_points_cpu(
+        const std::vector<double> *data,
+        std::vector<MSz_critical_point_t> &critical_points,
+        unsigned int critical_point_types,
+        int width, int height, int depth,
+        int neighbor_number) {
+    
+    int data_size = width * height * depth;
+    int maxNeighbors = neighbor_number == 1 ? 26 : 12;
+    
+    // Compute adjacency
+    std::vector<int> adjacency;
+    adjacency.resize(data_size * maxNeighbors);
+    computeAdjacency_cpu(adjacency, width, height, depth, maxNeighbors);
+    
+    // Extract minima and maxima based on requested types
+    bool extract_min = (critical_point_types & MSZ_PRESERVE_MIN) != 0;
+    bool extract_max = (critical_point_types & MSZ_PRESERVE_MAX) != 0;
+    bool extract_saddle = (critical_point_types & MSZ_PRESERVE_SADDLE) != 0;
+    
+    critical_points.clear();
+    
+    for (int i = 0; i < data_size; i++) {
+        bool is_maxima = true;
+        bool is_minima = true;
+        
+        // Check if it's a maximum
+        for (int index = 0; index < maxNeighbors; index++) {
+            int j = adjacency[i * maxNeighbors + index];
+            if (j == -1) continue;
+            
+            if ((*data)[j] > (*data)[i]) {
+                is_maxima = false;
+                break;
+            }
+            else if ((*data)[j] == (*data)[i] && j > i) {
+                is_maxima = false;
+                break;
+            }
+        }
+        
+        if (is_maxima) {
+            if (extract_max) {
+                MSz_critical_point_t cp;
+                cp.index = i;
+                cp.value = (*data)[i];
+                cp.type = MSZ_CRITICAL_MAXIMUM;
+                cp.z = i / (width * height);
+                int remainder = i % (width * height);
+                cp.y = remainder / width;
+                cp.x = remainder % width;
+                critical_points.push_back(cp);
+            }
+            continue;
+        }
+        
+        // Check if it's a minimum
+        for (int index = 0; index < maxNeighbors; index++) {
+            int j = adjacency[i * maxNeighbors + index];
+            if (j == -1) continue;
+            
+            if ((*data)[j] < (*data)[i]) {
+                is_minima = false;
+                break;
+            }
+            else if ((*data)[j] == (*data)[i] && j < i) {
+                is_minima = false;
+                break;
+            }
+        }
+        
+        if (is_minima) {
+            if (extract_min) {
+                MSz_critical_point_t cp;
+                cp.index = i;
+                cp.value = (*data)[i];
+                cp.type = MSZ_CRITICAL_MINIMUM;
+                cp.z = i / (width * height);
+                int remainder = i % (width * height);
+                cp.y = remainder / width;
+                cp.x = remainder % width;
+                critical_points.push_back(cp);
+            }
+            continue;
+        }
+        
+        // Check if it's a saddle point
+        if (extract_saddle) {
+            // A simplified saddle point detection using component counting of lower neighbors
+            std::vector<int> lower_neighbors;
+            for (int index = 0; index < maxNeighbors; index++) {
+                int j = adjacency[i * maxNeighbors + index];
+                if (j != -1 && ((*data)[j] < (*data)[i] || ((*data)[j] == (*data)[i] && j < i))) {
+                    lower_neighbors.push_back(j);
+                }
+            }
+            
+            if (lower_neighbors.size() > 1) {
+                // Count connected components among lower neighbors
+                int components = 0;
+                std::vector<bool> visited(lower_neighbors.size(), false);
+                for (size_t k = 0; k < lower_neighbors.size(); k++) {
+                    if (!visited[k]) {
+                        components++;
+                        // BFS to find all neighbors in the same component
+                        std::vector<int> q;
+                        q.push_back(lower_neighbors[k]);
+                        visited[k] = true;
+                        size_t head = 0;
+                        while(head < q.size()){
+                            int curr = q[head++];
+                            // Check all neighbors of curr that are also in lower_neighbors
+                            for(size_t m = 0; m < lower_neighbors.size(); m++){
+                                if(!visited[m]){
+                                    int next = lower_neighbors[m];
+                                    
+                                    // Check if next is adjacent to curr by looking in curr's adjacency list
+                                    bool are_adjacent = false;
+                                    for (int adj_idx = 0; adj_idx < maxNeighbors; adj_idx++) {
+                                        if (adjacency[curr * maxNeighbors + adj_idx] == next) {
+                                            are_adjacent = true;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (are_adjacent) {
+                                        visited[m] = true;
+                                        q.push_back(next);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                if (components > 1) {
+                    MSz_critical_point_t cp;
+                    cp.index = i;
+                    cp.value = (*data)[i];
+                    cp.type = MSZ_CRITICAL_SADDLE;
+                    cp.z = i / (width * height);
+                    int remainder = i % (width * height);
+                    cp.y = remainder / width;
+                    cp.x = remainder % width;
+                    critical_points.push_back(cp);
+                }
+            }
+        }
+    }
+    
+    return MSZ_ERR_NO_ERROR;
+}
+
 void initialization_cpu(std::vector<double> &d_deltaBuffer, int data_size, double bound) {
     for(int i =0;i<data_size;i++){
         d_deltaBuffer[i] = -4.0 * bound;
@@ -432,4 +585,3 @@ int count_false_cases_cpu(std::vector<int> *or_direction_as,std::vector<int> *or
     return MSZ_ERR_NO_ERROR;
 }
     
-

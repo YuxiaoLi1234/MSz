@@ -26,7 +26,52 @@ def main():
 
     print(f"Data dimensions: {W}x{H}x{D}")
 
-    # 1. Count faults
+    # 1. Extract critical points from original data
+    print("\n" + "="*60)
+    print("1. Extracting critical points from ORIGINAL data...")
+    print("="*60)
+    
+    result = msz.extract_critical_points(
+        original,
+        connectivity_type=0,
+        W=W, H=H, D=D,
+        accelerator=msz.ACCELERATOR_NONE
+    )
+    
+    if result['status'] == msz.ERR_NO_ERROR:
+        minima = result['minima']
+        maxima = result['maxima']
+        saddles = result['saddles']
+        
+        print(f"Found {len(minima)} minima, {len(maxima)} maxima, and {len(saddles)} saddle points.")
+        
+        # Display first few minima
+        print("\n=== Minima (first 5) ===")
+        for i, cp in enumerate(minima[:5]):
+            print(f"  [{i}] Position=({cp.x}, {cp.y}, {cp.z}), Value={cp.value:.6e}, Index={cp.index}")
+        if len(minima) > 5:
+            print(f"  ... and {len(minima) - 5} more.")
+        
+        # Display first few maxima
+        print("\n=== Maxima (first 5) ===")
+        for i, cp in enumerate(maxima[:5]):
+            print(f"  [{i}] Position=({cp.x}, {cp.y}, {cp.z}), Value={cp.value:.6e}, Index={cp.index}")
+        if len(maxima) > 5:
+            print(f"  ... and {len(maxima) - 5} more.")
+        
+        # Display first few saddle points
+        print("\n=== Saddle Points (first 5) ===")
+        for i, cp in enumerate(saddles[:5]):
+            print(f"  [{i}] Position=({cp.x}, {cp.y}, {cp.z}), Value={cp.value:.6e}, Index={cp.index}")
+        if len(saddles) > 5:
+            print(f"  ... and {len(saddles) - 5} more.")
+    else:
+        print(f"Error extracting critical points: {result['status']}")
+
+    # 2. Count faults
+    print("\n" + "="*60)
+    print("2. Counting faults in decompressed data...")
+    print("="*60)
     faults = msz.count_faults(
         original, 
         decompressed, 
@@ -36,7 +81,10 @@ def main():
     )
     print("Initial Faults count:", faults)
 
-    # 2. Derive edits
+    # 3. Derive edits
+    print("\n" + "="*60)
+    print("3. Deriving edits to fix faults...")
+    print("="*60)
     # Match C++: MSZ_PRESERVE_MIN | MSZ_PRESERVE_MAX, connectivity=0, rel_err=1e-4
     status, edits = msz.derive_edits(
         original,
@@ -44,7 +92,7 @@ def main():
         preservation_options=msz.PRESERVE_MIN | msz.PRESERVE_MAX,
         connectivity_type=0,
         W=W, H=H, D=D,
-        rel_err_bound=1e-4,
+        rel_err_bound=0.1,
         accelerator=msz.ACCELERATOR_NONE
     )
 
@@ -56,7 +104,10 @@ def main():
         print(f"Error deriving edits: {status}")
         return
 
-    # 3. Apply edits
+    # 4. Apply edits
+    print("\n" + "="*60)
+    print("4. Applying edits...")
+    print("="*60)
     # Apply to a copy to keep original decompressed data intact
     edited_data = decompressed.copy()
     status_apply = msz.apply_edits(
@@ -67,7 +118,7 @@ def main():
     )
     print(f"Apply edits status: {status_apply}")
 
-    # 4. Verify faults after edits
+    # 5. Verify faults after edits
     faults_after = msz.count_faults(
         original, 
         edited_data, 
@@ -77,7 +128,10 @@ def main():
     )
     print("Faults count after edits:", faults_after)
 
-    # 5. Optional: Zstd Compression (if enabled)
+    # 6. Optional: Zstd Compression (if enabled)
+    print("\n" + "="*60)
+    print("5. Testing Zstd compression...")
+    print("="*60)
     status_comp, compressed = msz.compress_edits_zstd(edits)
     if status_comp == msz.ERR_NO_ERROR:
         print(f"Compressed edits size: {len(compressed)} bytes")
@@ -88,3 +142,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

@@ -7,6 +7,7 @@
 enum {
     MSZ_PRESERVE_MIN = 0x1,    // Preserve minima
     MSZ_PRESERVE_MAX = 0x2,    // Preserve maxima
+    MSZ_PRESERVE_SADDLE = 0x4, // Preserve saddle points
     MSZ_PRESERVE_PATH = 0x8,   // Preserve separatrices that connecting minima and maxima
 };
 
@@ -70,6 +71,21 @@ enum {
 struct MSz_edit_t {
     uint32_t index; // index where edit is applied
     double offset;  // offset value corresponding to the index
+};
+
+// Enum for critical point types
+enum {
+    MSZ_CRITICAL_MINIMUM = 0,  // Local minimum
+    MSZ_CRITICAL_MAXIMUM = 1,  // Local maximum
+    MSZ_CRITICAL_SADDLE = 2    // Saddle point (for future use)
+};
+
+// Struct for representing critical points
+struct MSz_critical_point_t {
+    uint32_t index;      // Linear index of the critical point in the data array
+    int x, y, z;         // 3D coordinates of the critical point (z=0 for 2D data)
+    double value;        // Function value at the critical point
+    uint8_t type;        // Type of critical point (MSZ_CRITICAL_MINIMUM, MSZ_CRITICAL_MAXIMUM, etc.)
 };
 
 
@@ -153,11 +169,12 @@ struct MSz_edit_t {
   /**
   * @brief API for counting topological distortions in the decompressed data.
   * This function identifies and counts discrepancies between the original data and decompressed data,
-  * including false extrema (minima and maxima) and incorrectly labeled points in the Morse-Smale segmentation.
+  * including false extrema (minima, maxima, and saddle points) and incorrectly labeled points in the Morse-Smale segmentation.
   * @param original_data Pointer to the original data array.
   * @param decompressed_data Pointer to the decompressed data array.
   * @param num_false_min Output parameter to store the number of false minima detected in the decompressed data.
   * @param num_false_max Output parameter to store the number of false maxima detected in the decompressed data.
+  * @param num_false_saddle Output parameter to store the number of false saddle points detected in the decompressed data.
   * @param num_false_labels Output parameter to store the number of incorrectly labeled points in the Morse-Smale segmentation.
   * @param connectivity_type Connectivity type specifier:
   *        - `0`: Piecewise linear connectivity (e.g., in 2D: up, down, left, right, up-right, and bottom-left).
@@ -187,6 +204,7 @@ struct MSz_edit_t {
     *     decompressed_data,               // Input: decompressed dataset
     *     num_false_min,                   // Output: false minima count
     *     num_false_max,                   // Output: false maxima count
+    *     num_false_saddle,                // Output: false saddle points count
     *     num_false_labels,                // Output: mislabeled points count
     *     0,                               // Connectivity type: piecewise linear
     *     100, 100, 100,                   // Dimensions: W, H, D
@@ -199,6 +217,7 @@ struct MSz_edit_t {
     *     std::cout << "Fault counting succeeded." << std::endl;
     *     std::cout << "False minima: " << num_false_min << std::endl;
     *     std::cout << "False maxima: " << num_false_max << std::endl;
+    *     std::cout << "False saddle points: " << num_false_saddle << std::endl;
     *     std::cout << "False labels: " << num_false_labels << std::endl;
     * } else {
     *     std::cerr << "Error in fault counting. Error code: " << status << std::endl;
@@ -412,6 +431,107 @@ struct MSz_edit_t {
   );
 
 
+  /**
+ * @brief API for extracting critical points from input data for visualization.
+ *
+ * This function identifies and extracts all critical points (local minima and maxima) from the input data,
+ * returning them in separate arrays by type. Critical points are essential topological features that can be
+ * used for visualization, analysis, and understanding the structure of scalar fields.
+ *
+ * @param data Pointer to the input data array.
+ * @param num_minima Output parameter to store the number of minima found.
+ * @param minima Output parameter to store a pointer to the array of minima critical points.
+ *        The function allocates memory for the array, and the caller is responsible for freeing it.
+ *        Will be set to nullptr if no minima are found.
+ * @param num_maxima Output parameter to store the number of maxima found.
+ * @param maxima Output parameter to store a pointer to the array of maxima critical points.
+ *        The function allocates memory for the array, and the caller is responsible for freeing it.
+ *        Will be set to nullptr if no maxima are found.
+ * @param connectivity_type Connectivity type specifier:
+ *        - `0`: Piecewise linear connectivity (e.g., in 2D: up, down, left, right, up-right, and bottom-left).
+ *        - `1`: Full connectivity (e.g., in 2D: includes all diagonal connections).
+ * @param W, H, D Dimensions of the data grid:
+ *        - `W`: Width of the data grid (x-dimension).
+ *        - `H`: Height of the data grid (y-dimension).
+ *        - `D`: Depth of the data grid (z-dimension). For 2D datasets, set `D` to 1.
+ * @param accelerator Hardware accelerator for computation:
+ *        - `MSZ_ACCELERATOR_CUDA`: Use CUDA-based GPU acceleration.
+ *        - `MSZ_ACCELERATOR_OMP`: Use OpenMP-based CPU parallelization.
+ *        - `MSZ_ACCELERATOR_NONE`: Use pure CPU for computation.
+ * @param device_id GPU device ID (used only if `accelerator` is `MSZ_ACCELERATOR_CUDA`).
+ * @param num_omp_threads Number of threads (used only if `accelerator` is `MSZ_ACCELERATOR_OMP`).
+ *
+ * @return Returns `MSZ_ERR_NO_ERROR` if the function executes successfully.
+ *         Possible error codes include:
+ *         - `MSZ_ERR_INVALID_INPUT`: Input parameters are invalid.
+ *         - `MSZ_ERR_OUT_OF_MEMORY`: Memory allocation failed.
+ *         - `MSZ_ERR_UNKNOWN_ERROR`: An unknown error occurred.
+ *
+ * @note 
+ * - Ensure that `data` points to a valid memory region with dimensions `W x H x D`.
+ * - The caller is responsible for freeing the memory allocated for both `minima` and `maxima` using `free()`.
+ * - Each critical point includes its linear index, 3D coordinates (x, y, z), function value, and type.
+ * - Both minima and maxima are always extracted and returned in separate arrays.
+ *
+ * @example
+ * For a 2D dataset with dimensions 100x100, extract all critical points:
+ *
+ * double* data = /* allocate and initialize the dataset;
+ * int num_minima = 0, num_maxima = 0;
+ * MSz_critical_point_t* minima = nullptr;
+ * MSz_critical_point_t* maxima = nullptr;
+ * 
+ * int status = MSz_extract_critical_points(
+ *     data,                             // Input: data array
+ *     num_minima,                       // Output: number of minima
+ *     &minima,                          // Output: minima array
+ *     num_maxima,                       // Output: number of maxima
+ *     &maxima,                          // Output: maxima array
+ *     0,                                // Piecewise linear connectivity
+ *     100, 100, 1,                      // W, H, D (2D data)
+ *     MSZ_ACCELERATOR_CUDA,             // Use CUDA for acceleration
+ *     0,                                // Use default GPU device
+ *     1                                 // OpenMP threads not applicable
+ * );
+ * 
+ * if (status == MSZ_ERR_NO_ERROR) {
+ *     std::cout << "Found " << num_minima << " minima and " << num_maxima << " maxima." << std::endl;
+ *     
+ *     std::cout << "\\nMinima:" << std::endl;
+ *     for (int i = 0; i < num_minima; ++i) {
+ *         std::cout << "  [" << i << "] Position=(" << minima[i].x << ", "
+ *                   << minima[i].y << ", " << minima[i].z << "), Value=" 
+ *                   << minima[i].value << std::endl;
+ *     }
+ *     
+ *     std::cout << "\\nMaxima:" << std::endl;
+ *     for (int i = 0; i < num_maxima; ++i) {
+ *         std::cout << "  [" << i << "] Position=(" << maxima[i].x << ", "
+ *                   << maxima[i].y << ", " << maxima[i].z << "), Value=" 
+ *                   << maxima[i].value << std::endl;
+ *     }
+ *     
+ *     // Free allocated memory
+ *     free(minima);
+ *     free(maxima);
+ * } else {
+ *     std::cerr << "Failed to extract critical points. Error code: " << status << std::endl;
+ * }
+ */
+  int MSz_extract_critical_points( // return MSZ_ERR_NO_ERROR if success
+      const double *data,                    // Input: data array
+      int &num_minima,                       // Output: number of minima
+      MSz_critical_point_t **minima,         // Output: array of minima
+      int &num_maxima,                       // Output: number of maxima
+      MSz_critical_point_t **maxima,         // Output: array of maxima
+      int &num_saddle_points,                // Output: number of saddle points
+      MSz_critical_point_t **saddle_points,  // Output: array of saddle points
+      unsigned int connectivity_type,        // Connectivity type specifier
+      int W, int H, int D,                   // Dimensions of the data
+      int accelerator = MSZ_ACCELERATOR_NONE, // Hardware accelerator
+      int device_id = 0,                     // GPU device ID (used if accelerator is CUDA)
+      int num_omp_threads = 1                // Number of threads (used if accelerator is OMP)
+  );
 
 
 #endif // _MSZ_API_H

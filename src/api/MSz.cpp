@@ -503,5 +503,139 @@ int MSz_apply_edits(
 }
 
 
+int MSz_extract_critical_points(const double *data, int &num_minima,
+                                MSz_critical_point_t **minima, int &num_maxima,
+                                MSz_critical_point_t **maxima,
+                                int &num_saddle_points,
+                                MSz_critical_point_t **saddle_points,
+                                unsigned int connectivity_type, int W, int H,
+                                int D, int accelerator, int device_id,
+                                int num_omp_threads) {
 
+  // Input validation
+  if (!data || W <= 0 || H <= 0 || D <= 0) {
+    return MSZ_ERR_INVALID_INPUT;
+  }
 
+  if (connectivity_type != 0 && connectivity_type != 1) {
+    return MSZ_ERR_INVALID_CONNECTIVITY_TYPE;
+  }
+
+  // Convert input data to vector
+  std::vector<double> data_vec(data, data + W * H * D);
+  std::vector<MSz_critical_point_t> cp_vec;
+
+  int status = MSZ_ERR_NO_ERROR;
+
+  // Always extract minima, maxima, and saddle points
+  unsigned int critical_point_types = MSZ_PRESERVE_MIN | MSZ_PRESERVE_MAX | MSZ_PRESERVE_SADDLE;
+
+  // Call appropriate backend based on accelerator type
+  if (accelerator == MSZ_ACCELERATOR_CUDA) {
+    return MSZ_ERR_NOT_IMPLEMENTED;
+  } else if (accelerator == MSZ_ACCELERATOR_OMP) {
+#if MSZ_ENABLE_OPENMP
+    if (num_omp_threads < 0) {
+      return MSZ_ERR_INVALID_THREAD_COUNT;
+    }
+    if (num_omp_threads == 0) {
+      num_omp_threads = omp_get_max_threads();
+    }
+    omp_set_num_threads(num_omp_threads);
+    status = extract_critical_points_omp(
+        &data_vec, cp_vec, critical_point_types, W, H, D, connectivity_type);
+#else
+    return MSZ_ERR_NOT_IMPLEMENTED;
+#endif
+  } else if (accelerator == MSZ_ACCELERATOR_NONE) {
+    status = extract_critical_points_cpu(
+        &data_vec, cp_vec, critical_point_types, W, H, D, connectivity_type);
+  } else {
+    return MSZ_ERR_NOT_IMPLEMENTED;
+  }
+
+  if (status != MSZ_ERR_NO_ERROR) {
+    return status;
+  }
+
+  // Separate critical points by type
+  std::vector<MSz_critical_point_t> minima_vec;
+  std::vector<MSz_critical_point_t> maxima_vec;
+  std::vector<MSz_critical_point_t> saddle_vec;
+
+  for (const auto &cp : cp_vec) {
+    if (cp.type == MSZ_CRITICAL_MINIMUM) {
+      minima_vec.push_back(cp);
+    } else if (cp.type == MSZ_CRITICAL_MAXIMUM) {
+      maxima_vec.push_back(cp);
+    } else if (cp.type == MSZ_CRITICAL_SADDLE) {
+      saddle_vec.push_back(cp);
+    }
+  }
+
+  // Set counts
+  num_minima = minima_vec.size();
+  num_maxima = maxima_vec.size();
+  num_saddle_points = saddle_vec.size();
+
+  // Helper to clean up on error
+  auto cleanup = [&]() {
+    if (*minima) free(*minima);
+    if (*maxima) free(*maxima);
+    if (*saddle_points) free(*saddle_points);
+    *minima = nullptr;
+    *maxima = nullptr;
+    *saddle_points = nullptr;
+    num_minima = 0;
+    num_maxima = 0;
+    num_saddle_points = 0;
+  };
+
+  *minima = nullptr;
+  *maxima = nullptr;
+  *saddle_points = nullptr;
+
+  // Allocate and populate minima array
+  if (num_minima > 0) {
+    *minima = (MSz_critical_point_t *)malloc(num_minima *
+                                             sizeof(MSz_critical_point_t));
+    if (*minima == nullptr) {
+      std::cerr << "Memory allocation failed for minima." << std::endl;
+      cleanup();
+      return MSZ_ERR_OUT_OF_MEMORY;
+    }
+    for (int i = 0; i < num_minima; ++i) {
+      (*minima)[i] = minima_vec[i];
+    }
+  }
+
+  // Allocate and populate maxima array
+  if (num_maxima > 0) {
+    *maxima = (MSz_critical_point_t *)malloc(num_maxima *
+                                             sizeof(MSz_critical_point_t));
+    if (*maxima == nullptr) {
+      std::cerr << "Memory allocation failed for maxima." << std::endl;
+      cleanup();
+      return MSZ_ERR_OUT_OF_MEMORY;
+    }
+    for (int i = 0; i < num_maxima; ++i) {
+      (*maxima)[i] = maxima_vec[i];
+    }
+  }
+
+  // Allocate and populate saddle points array
+  if (num_saddle_points > 0) {
+    *saddle_points = (MSz_critical_point_t *)malloc(num_saddle_points *
+                                                   sizeof(MSz_critical_point_t));
+    if (*saddle_points == nullptr) {
+      std::cerr << "Memory allocation failed for saddle points." << std::endl;
+      cleanup();
+      return MSZ_ERR_OUT_OF_MEMORY;
+    }
+    for (int i = 0; i < num_saddle_points; ++i) {
+      (*saddle_points)[i] = saddle_vec[i];
+    }
+  }
+
+  return MSZ_ERR_NO_ERROR;
+}

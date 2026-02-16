@@ -39,6 +39,13 @@ int count_false_cases_cpu(std::vector<int> *or_direction_as,std::vector<int> *or
         std::vector<int>* dec_label,std::vector<int>* or_label, 
         int width, int height, int depth, 
         int neighbor_number,
-        int &wrong_min, int &wrong_max,  int &wrong_labels);
+        int &wrong_min, int &wrong_max, int &wrong_labels);
+
+int extract_critical_points_cpu(
+        const std::vector<double> *data,
+        std::vector<MSz_critical_point_t> &critical_points,
+        unsigned int critical_point_types,
+        int width, int height, int depth,
+        int neighbor_number);
 
 #endif // MSZ_CPU_INTERNAL_H
