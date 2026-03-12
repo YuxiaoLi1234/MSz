@@ -366,7 +366,8 @@ PYBIND11_MODULE(msz, m) {
         >>> status = msz.apply_edits(decompressed, edits, 100, 100, 1)
        )pbdoc");
 
-    m.def("extract_critical_points", [](py_array_double data, unsigned int connectivity_type,
+    m.def("extract_critical_points", [](py_array_double data, bool compute_segmentation,
+                                        unsigned int connectivity_type,
                                         int W, int H, int D, int accelerator, 
                                         int device_id, int num_omp_threads) {
         
@@ -380,6 +381,7 @@ PYBIND11_MODULE(msz, m) {
         MSz_critical_point_t* minima_ptr = nullptr;
         MSz_critical_point_t* maxima_ptr = nullptr;
         MSz_critical_point_t* saddle_ptr = nullptr;
+        int* labels_ptr = nullptr;
         
         const double* ptr_data = data.data();
 
@@ -394,6 +396,8 @@ PYBIND11_MODULE(msz, m) {
                 &maxima_ptr,
                 num_saddle,
                 &saddle_ptr,
+                &labels_ptr,
+                compute_segmentation,
                 connectivity_type,
                 W, H, D,
                 accelerator,
@@ -405,6 +409,7 @@ PYBIND11_MODULE(msz, m) {
         std::vector<MSz_critical_point_t> minima_vec;
         std::vector<MSz_critical_point_t> maxima_vec;
         std::vector<MSz_critical_point_t> saddle_vec;
+        py::array_t<int> labels_arr;
         
         if (status == MSZ_ERR_NO_ERROR) {
             if (minima_ptr != nullptr) {
@@ -419,10 +424,28 @@ PYBIND11_MODULE(msz, m) {
                 saddle_vec.assign(saddle_ptr, saddle_ptr + num_saddle);
                 free(saddle_ptr);
             }
+            if (compute_segmentation && labels_ptr != nullptr) {
+                labels_arr = py::array_t<int>({W, H, D, 2});
+                auto r = labels_arr.mutable_unchecked<4>();
+                for (int z = 0; z < D; ++z) {
+                    for (int y = 0; y < H; ++y) {
+                        for (int x = 0; x < W; ++x) {
+                            int idx = (z * H * W) + (y * W) + x;
+                            r(x, y, z, 0) = labels_ptr[idx * 2];
+                            r(x, y, z, 1) = labels_ptr[idx * 2 + 1];
+                        }
+                    }
+                }
+                free(labels_ptr);
+            }
         }
 
-        return py::dict("status"_a=status, "minima"_a=minima_vec, "maxima"_a=maxima_vec, "saddles"_a=saddle_vec);
-    }, py::arg("data"), py::arg("connectivity_type"),
+        auto result = py::dict("status"_a=status, "minima"_a=minima_vec, "maxima"_a=maxima_vec, "saddles"_a=saddle_vec);
+        if (compute_segmentation) {
+            result["labels"] = labels_arr;
+        }
+        return result;
+    }, py::arg("data"), py::arg("compute_segmentation") = false, py::arg("connectivity_type"),
        py::arg("W"), py::arg("H"), py::arg("D"),
        py::arg("accelerator") = (int)MSZ_ACCELERATOR_NONE,
        py::arg("device_id") = 0,
@@ -434,6 +457,8 @@ PYBIND11_MODULE(msz, m) {
         ----------
         data : numpy.ndarray
             Input data array of shape (W, H, D) or (W*H*D,)
+        compute_segmentation : bool, optional
+            Whether to compute Morse segmentation labels (default: False)
         connectivity_type : int
             0 for piecewise linear connectivity, 1 for full connectivity
         W, H, D : int
@@ -453,6 +478,8 @@ PYBIND11_MODULE(msz, m) {
             - 'minima': list of CriticalPoint - List of minimum critical points
             - 'maxima': list of CriticalPoint - List of maximum critical points
             - 'saddles': list of CriticalPoint - List of saddle points
+            - 'labels': numpy.ndarray (optional) - Array of shape (W, H, D, 2) containing Morse labels
+              (only present if compute_segmentation=True)
         
         Examples
         --------

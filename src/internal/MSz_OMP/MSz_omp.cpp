@@ -87,20 +87,10 @@ void initializeWithIndex(std::vector<int>& label, const std::vector<int>* direct
     int data_size = label.size()/2;
     #pragma omp parallel for
     for(int index=0;index<data_size;index++){
-        
-        if((*direction_ds)[index]!=-1){
-            label[index*2] = index;
-        }
-        else{
-            label[index*2] = -1;
-        }
-
-        if((*direction_as)[index]!=-1){
-            label[index*2+1] = index;
-        }
-        else{
-            label[index*2+1] = -1;
-        }
+        // Always initialize to self so extrema (direction == -1) keep a stable,
+        // non-negative manifold id like TTK.
+        label[index*2] = index;
+        label[index*2+1] = index;
     }
 };
 
@@ -276,7 +266,7 @@ int fix_process_omp(std::vector<int> *or_direction_as,std::vector<int> *or_direc
     std::vector<double> d_deltaBuffer;
     std::vector<int> adjacency, false_max, false_min;
     std::atomic<int>* id_array = new std::atomic<int>[data_size];
-    int maxNeighbors = 26;
+    int maxNeighbors = (neighbor_number == 1) ? 26 : 14;
 
     d_deltaBuffer.resize(data_size,-4.0 * bound);
 
@@ -417,6 +407,7 @@ int fix_process_omp(std::vector<int> *or_direction_as,std::vector<int> *or_direc
         mappath(*dec_label, de_direction_as, de_direction_ds, width, height, depth, maxNeighbors);
         get_wrong_index_path(or_label, dec_label, wrong_index_as, wrong_index_ds, data_size);
     };
+    delete[] id_array;
     return MSZ_ERR_NO_ERROR;
 }
 
@@ -464,16 +455,19 @@ int count_false_cases_omp(std::vector<int> *or_direction_as,std::vector<int> *or
     wrong_min = count_f_min;
     wrong_max = count_f_max;
 
+    delete[] id_array;
     return MSZ_ERR_NO_ERROR;
 }
 
 
 int extract_critical_points_omp(
-        const std::vector<double> *data,
-        std::vector<MSz_critical_point_t> &critical_points,
-        unsigned int critical_point_types,
-        int width, int height, int depth,
-        int neighbor_number) {
+    const std::vector<double> *data,
+    std::vector<MSz_critical_point_t> &critical_points,
+    std::vector<int> &labels,
+    bool compute_segmentation,
+    unsigned int critical_point_types,
+    int width, int height, int depth,
+    int neighbor_number) {
 
     int data_size = width * height * depth;
     int maxNeighbors = neighbor_number == 1 ? 26 : 12;
@@ -527,7 +521,6 @@ int extract_critical_points_omp(
                     cp.x = remainder % width;
                     local.push_back(cp);
                 }
-                continue;
             }
 
             // Check minima
@@ -555,11 +548,10 @@ int extract_critical_points_omp(
                     cp.x = remainder % width;
                     local.push_back(cp);
                 }
-                continue;
             }
 
             // Saddle detection
-            if (extract_saddle) {
+            if (extract_saddle && !is_maxima && !is_minima) {
                 std::vector<int> lower_neighbors;
                 for (int idx = 0; idx < maxNeighbors; ++idx) {
                     int j = adjacency[i * maxNeighbors + idx];
@@ -620,6 +612,17 @@ int extract_critical_points_omp(
         if (!v.empty()) {
             critical_points.insert(critical_points.end(), v.begin(), v.end());
         }
+    }
+
+    // Compute segmentation if requested
+    if (compute_segmentation) {
+        labels.resize(data_size * 2);
+        std::vector<int> direction_as(data_size);
+        std::vector<int> direction_ds(data_size);
+        
+        find_direction(data, &adjacency, direction_as, direction_ds, width, height, depth, maxNeighbors);
+        
+        mappath(labels, &direction_as, &direction_ds, width, height, depth, maxNeighbors);
     }
 
     return MSZ_ERR_NO_ERROR;

@@ -40,6 +40,124 @@
     #include "MSz_CUDA.h"
 #endif
 
+namespace {
+
+inline int flatten_index(int x, int y, int z, int W, int H) {
+  return x + y * W + z * W * H;
+}
+
+void smooth_singleton_channel(std::vector<int> &labels, int channel, int W, int H, int D) {
+  const int total_points = W * H * D;
+  std::vector<unsigned char> visited(total_points, 0);
+  std::vector<int> stack;
+  std::vector<int> component;
+  stack.reserve(64);
+  component.reserve(64);
+
+  const int deltas[6][3] = {
+      {-1, 0, 0}, {1, 0, 0}, {0, -1, 0},
+      {0, 1, 0},  {0, 0, -1}, {0, 0, 1},
+  };
+
+  for (int seed = 0; seed < total_points; ++seed) {
+    if (visited[seed]) {
+      continue;
+    }
+
+    const int seed_label = labels[seed * 2 + channel];
+    visited[seed] = 1;
+    stack.clear();
+    component.clear();
+    stack.push_back(seed);
+
+    while (!stack.empty()) {
+      const int cur = stack.back();
+      stack.pop_back();
+      component.push_back(cur);
+
+      const int z = cur / (W * H);
+      const int rem = cur % (W * H);
+      const int y = rem / W;
+      const int x = rem % W;
+
+      for (int k = 0; k < 6; ++k) {
+        const int nx = x + deltas[k][0];
+        const int ny = y + deltas[k][1];
+        const int nz = z + deltas[k][2];
+        if (nx < 0 || nx >= W || ny < 0 || ny >= H || nz < 0 || nz >= D) {
+          continue;
+        }
+        const int ni = flatten_index(nx, ny, nz, W, H);
+        if (!visited[ni] && labels[ni * 2 + channel] == seed_label) {
+          visited[ni] = 1;
+          stack.push_back(ni);
+        }
+      }
+    }
+
+    if (component.size() != 1) {
+      continue;
+    }
+
+    const int idx = component[0];
+    const int z = idx / (W * H);
+    const int rem = idx % (W * H);
+    const int y = rem / W;
+    const int x = rem % W;
+
+    std::unordered_map<int, int> neighbor_counts;
+    for (int k = 0; k < 6; ++k) {
+      const int nx = x + deltas[k][0];
+      const int ny = y + deltas[k][1];
+      const int nz = z + deltas[k][2];
+      if (nx < 0 || nx >= W || ny < 0 || ny >= H || nz < 0 || nz >= D) {
+        continue;
+      }
+      const int ni = flatten_index(nx, ny, nz, W, H);
+      const int nlabel = labels[ni * 2 + channel];
+      if (nlabel == seed_label) {
+        continue;
+      }
+      neighbor_counts[nlabel] += 1;
+    }
+
+    if (neighbor_counts.empty()) {
+      continue;
+    }
+
+    int best_label = seed_label;
+    int best_count = -1;
+    bool best_is_non_negative = false;
+    bool best_initialized = false;
+    for (const auto &entry : neighbor_counts) {
+      const int cand_label = entry.first;
+      const int cand_count = entry.second;
+      const bool cand_non_negative = cand_label >= 0;
+      if (!best_initialized ||
+          cand_count > best_count ||
+          (cand_count == best_count && cand_non_negative && !best_is_non_negative) ||
+          (cand_count == best_count && cand_non_negative == best_is_non_negative &&
+           cand_label < best_label)) {
+        best_label = cand_label;
+        best_count = cand_count;
+        best_is_non_negative = cand_non_negative;
+        best_initialized = true;
+      }
+    }
+
+    labels[idx * 2 + channel] = best_label;
+  }
+}
+
+void smooth_singleton_components(std::vector<int> &labels, int W, int H, int D) {
+  if (labels.size() != static_cast<size_t>(W * H * D * 2)) {
+    return;
+  }
+  smooth_singleton_channel(labels, 0, W, H, D);
+  smooth_singleton_channel(labels, 1, W, H, D);
+}
+
+} // namespace
 
 
 int MSz_derive_edits(
@@ -486,10 +604,9 @@ int MSz_apply_edits(
 
     else if (accelerator == MSZ_ACCELERATOR_CUDA) {
         #ifdef MSZ_ENABLE_CUDA
-            MSz_apply_edits_cuda(decompressed_data,
-                                 num_edits, 
-                                 edits, W, H,D, accelerator, device_id);
-            return 0;
+            return MSz_apply_edits_cuda(decompressed_data,
+                                        num_edits, 
+                                        edits, W, H, D, accelerator, device_id);
         #else
             return MSZ_ERR_NOT_IMPLEMENTED;
         #endif
@@ -508,6 +625,8 @@ int MSz_extract_critical_points(const double *data, int &num_minima,
                                 MSz_critical_point_t **maxima,
                                 int &num_saddle_points,
                                 MSz_critical_point_t **saddle_points,
+                                int **labels,
+                                bool compute_segmentation,
                                 unsigned int connectivity_type, int W, int H,
                                 int D, int accelerator, int device_id,
                                 int num_omp_threads) {
@@ -524,6 +643,7 @@ int MSz_extract_critical_points(const double *data, int &num_minima,
   // Convert input data to vector
   std::vector<double> data_vec(data, data + W * H * D);
   std::vector<MSz_critical_point_t> cp_vec;
+  std::vector<int> labels_vec;
 
   int status = MSZ_ERR_NO_ERROR;
 
@@ -543,19 +663,23 @@ int MSz_extract_critical_points(const double *data, int &num_minima,
     }
     omp_set_num_threads(num_omp_threads);
     status = extract_critical_points_omp(
-        &data_vec, cp_vec, critical_point_types, W, H, D, connectivity_type);
+        &data_vec, cp_vec, labels_vec, compute_segmentation, critical_point_types, W, H, D, connectivity_type);
 #else
     return MSZ_ERR_NOT_IMPLEMENTED;
 #endif
   } else if (accelerator == MSZ_ACCELERATOR_NONE) {
     status = extract_critical_points_cpu(
-        &data_vec, cp_vec, critical_point_types, W, H, D, connectivity_type);
+        &data_vec, cp_vec, labels_vec, compute_segmentation, critical_point_types, W, H, D, connectivity_type);
   } else {
     return MSZ_ERR_NOT_IMPLEMENTED;
   }
 
   if (status != MSZ_ERR_NO_ERROR) {
     return status;
+  }
+
+  if (compute_segmentation) {
+    smooth_singleton_components(labels_vec, W, H, D);
   }
 
   // Separate critical points by type
@@ -580,23 +704,26 @@ int MSz_extract_critical_points(const double *data, int &num_minima,
 
   // Helper to clean up on error
   auto cleanup = [&]() {
-    if (*minima) free(*minima);
-    if (*maxima) free(*maxima);
-    if (*saddle_points) free(*saddle_points);
-    *minima = nullptr;
-    *maxima = nullptr;
-    *saddle_points = nullptr;
+    if (minima && *minima) free(*minima);
+    if (maxima && *maxima) free(*maxima);
+    if (saddle_points && *saddle_points) free(*saddle_points);
+    if (labels && *labels) free(*labels);
+    if (minima) *minima = nullptr;
+    if (maxima) *maxima = nullptr;
+    if (saddle_points) *saddle_points = nullptr;
+    if (labels) *labels = nullptr;
     num_minima = 0;
     num_maxima = 0;
     num_saddle_points = 0;
   };
 
-  *minima = nullptr;
-  *maxima = nullptr;
-  *saddle_points = nullptr;
+  if (minima) *minima = nullptr;
+  if (maxima) *maxima = nullptr;
+  if (saddle_points) *saddle_points = nullptr;
+  if (labels) *labels = nullptr;
 
   // Allocate and populate minima array
-  if (num_minima > 0) {
+  if (num_minima > 0 && minima) {
     *minima = (MSz_critical_point_t *)malloc(num_minima *
                                              sizeof(MSz_critical_point_t));
     if (*minima == nullptr) {
@@ -610,7 +737,7 @@ int MSz_extract_critical_points(const double *data, int &num_minima,
   }
 
   // Allocate and populate maxima array
-  if (num_maxima > 0) {
+  if (num_maxima > 0 && maxima) {
     *maxima = (MSz_critical_point_t *)malloc(num_maxima *
                                              sizeof(MSz_critical_point_t));
     if (*maxima == nullptr) {
@@ -624,7 +751,7 @@ int MSz_extract_critical_points(const double *data, int &num_minima,
   }
 
   // Allocate and populate saddle points array
-  if (num_saddle_points > 0) {
+  if (num_saddle_points > 0 && saddle_points) {
     *saddle_points = (MSz_critical_point_t *)malloc(num_saddle_points *
                                                    sizeof(MSz_critical_point_t));
     if (*saddle_points == nullptr) {
@@ -635,6 +762,18 @@ int MSz_extract_critical_points(const double *data, int &num_minima,
     for (int i = 0; i < num_saddle_points; ++i) {
       (*saddle_points)[i] = saddle_vec[i];
     }
+  }
+
+  // Allocate and populate labels if requested
+  if (compute_segmentation && labels) {
+    int total_points = W * H * D;
+    *labels = (int *)malloc(total_points * 2 * sizeof(int));
+    if (*labels == nullptr) {
+        std::cerr << "Memory allocation failed for labels." << std::endl;
+        cleanup();
+        return MSZ_ERR_OUT_OF_MEMORY;
+    }
+    std::copy(labels_vec.begin(), labels_vec.end(), *labels);
   }
 
   return MSZ_ERR_NO_ERROR;

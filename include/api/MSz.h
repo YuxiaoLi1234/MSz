@@ -432,91 +432,32 @@ struct MSz_critical_point_t {
 
 
   /**
- * @brief API for extracting critical points from input data for visualization.
+ * @brief API for extracting critical points from input data and optionally computing Morse segmentation.
  *
- * This function identifies and extracts all critical points (local minima and maxima) from the input data,
- * returning them in separate arrays by type. Critical points are essential topological features that can be
- * used for visualization, analysis, and understanding the structure of scalar fields.
+ * This function identifies and extracts all critical points (local minima, maxima, and optionally saddle points)
+ * from the input data. It can also optionally compute the Morse-Smale segmentation, returning the indices of
+ * the destination extrema for every point in the dataset.
  *
  * @param data Pointer to the input data array.
  * @param num_minima Output parameter to store the number of minima found.
  * @param minima Output parameter to store a pointer to the array of minima critical points.
  *        The function allocates memory for the array, and the caller is responsible for freeing it.
- *        Will be set to nullptr if no minima are found.
  * @param num_maxima Output parameter to store the number of maxima found.
  * @param maxima Output parameter to store a pointer to the array of maxima critical points.
- *        The function allocates memory for the array, and the caller is responsible for freeing it.
- *        Will be set to nullptr if no maxima are found.
- * @param connectivity_type Connectivity type specifier:
- *        - `0`: Piecewise linear connectivity (e.g., in 2D: up, down, left, right, up-right, and bottom-left).
- *        - `1`: Full connectivity (e.g., in 2D: includes all diagonal connections).
- * @param W, H, D Dimensions of the data grid:
- *        - `W`: Width of the data grid (x-dimension).
- *        - `H`: Height of the data grid (y-dimension).
- *        - `D`: Depth of the data grid (z-dimension). For 2D datasets, set `D` to 1.
- * @param accelerator Hardware accelerator for computation:
- *        - `MSZ_ACCELERATOR_CUDA`: Use CUDA-based GPU acceleration.
- *        - `MSZ_ACCELERATOR_OMP`: Use OpenMP-based CPU parallelization.
- *        - `MSZ_ACCELERATOR_NONE`: Use pure CPU for computation.
+ * @param num_saddle_points Output parameter to store the number of saddle points found.
+ * @param saddle_points Output parameter to store a pointer to the array of saddle points.
+ * @param labels Optional output parameter to store the Morse segmentation labels. If provided, the function 
+ *        allocates an array of size 2 * W * H * D. For each point `i`, `labels[2*i]` is the index of its 
+ *        destination minimum and `labels[2*i+1]` is the index of its destination maximum.
+ *        The caller is responsible for freeing this memory.
+ * @param compute_segmentation If true, the function computes the Morse-Smale segmentation labels.
+ * @param connectivity_type Connectivity type specifier (0 for piecewise linear, 1 for full).
+ * @param W, H, D Dimensions of the data grid.
+ * @param accelerator Hardware accelerator for computation.
  * @param device_id GPU device ID (used only if `accelerator` is `MSZ_ACCELERATOR_CUDA`).
  * @param num_omp_threads Number of threads (used only if `accelerator` is `MSZ_ACCELERATOR_OMP`).
  *
  * @return Returns `MSZ_ERR_NO_ERROR` if the function executes successfully.
- *         Possible error codes include:
- *         - `MSZ_ERR_INVALID_INPUT`: Input parameters are invalid.
- *         - `MSZ_ERR_OUT_OF_MEMORY`: Memory allocation failed.
- *         - `MSZ_ERR_UNKNOWN_ERROR`: An unknown error occurred.
- *
- * @note 
- * - Ensure that `data` points to a valid memory region with dimensions `W x H x D`.
- * - The caller is responsible for freeing the memory allocated for both `minima` and `maxima` using `free()`.
- * - Each critical point includes its linear index, 3D coordinates (x, y, z), function value, and type.
- * - Both minima and maxima are always extracted and returned in separate arrays.
- *
- * @example
- * For a 2D dataset with dimensions 100x100, extract all critical points:
- *
- * double* data = /* allocate and initialize the dataset;
- * int num_minima = 0, num_maxima = 0;
- * MSz_critical_point_t* minima = nullptr;
- * MSz_critical_point_t* maxima = nullptr;
- * 
- * int status = MSz_extract_critical_points(
- *     data,                             // Input: data array
- *     num_minima,                       // Output: number of minima
- *     &minima,                          // Output: minima array
- *     num_maxima,                       // Output: number of maxima
- *     &maxima,                          // Output: maxima array
- *     0,                                // Piecewise linear connectivity
- *     100, 100, 1,                      // W, H, D (2D data)
- *     MSZ_ACCELERATOR_CUDA,             // Use CUDA for acceleration
- *     0,                                // Use default GPU device
- *     1                                 // OpenMP threads not applicable
- * );
- * 
- * if (status == MSZ_ERR_NO_ERROR) {
- *     std::cout << "Found " << num_minima << " minima and " << num_maxima << " maxima." << std::endl;
- *     
- *     std::cout << "\\nMinima:" << std::endl;
- *     for (int i = 0; i < num_minima; ++i) {
- *         std::cout << "  [" << i << "] Position=(" << minima[i].x << ", "
- *                   << minima[i].y << ", " << minima[i].z << "), Value=" 
- *                   << minima[i].value << std::endl;
- *     }
- *     
- *     std::cout << "\\nMaxima:" << std::endl;
- *     for (int i = 0; i < num_maxima; ++i) {
- *         std::cout << "  [" << i << "] Position=(" << maxima[i].x << ", "
- *                   << maxima[i].y << ", " << maxima[i].z << "), Value=" 
- *                   << maxima[i].value << std::endl;
- *     }
- *     
- *     // Free allocated memory
- *     free(minima);
- *     free(maxima);
- * } else {
- *     std::cerr << "Failed to extract critical points. Error code: " << status << std::endl;
- * }
  */
   int MSz_extract_critical_points( // return MSZ_ERR_NO_ERROR if success
       const double *data,                    // Input: data array
@@ -526,6 +467,8 @@ struct MSz_critical_point_t {
       MSz_critical_point_t **maxima,         // Output: array of maxima
       int &num_saddle_points,                // Output: number of saddle points
       MSz_critical_point_t **saddle_points,  // Output: array of saddle points
+      int **labels,                          // Output: Morse labels (optional)
+      bool compute_segmentation,             // Input: whether to compute segmentation
       unsigned int connectivity_type,        // Connectivity type specifier
       int W, int H, int D,                   // Dimensions of the data
       int accelerator = MSZ_ACCELERATOR_NONE, // Hardware accelerator

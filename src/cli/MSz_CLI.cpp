@@ -132,7 +132,7 @@ int main(int argc, char* argv[]) {
     std::string command = argv[1];
 
     if (command == "count_faults") {
-        if (argc != 9) {  
+        if (argc != 10) {  
             std::cerr << "Error: Incorrect number of arguments for count_faults." << std::endl;
             print_usage();
             return MSZ_ERR_INVALID_INPUT;
@@ -144,7 +144,7 @@ int main(int argc, char* argv[]) {
         int height = std::stoi(argv[5]);
         int depth = std::stoi(argv[6]);
         int connectivity = std::stoi(argv[7]);
-        std::string mode = argv[8];
+        std::string mode = argv[9];
 
         int accelerator = (mode == "omp") ? MSZ_ACCELERATOR_OMP :
                           (mode == "cuda") ? MSZ_ACCELERATOR_CUDA : MSZ_ACCELERATOR_NONE;
@@ -173,8 +173,7 @@ int main(int argc, char* argv[]) {
         }
 
     } else if (command == "derive_edits") {
-        if (argc != 13) {
-            std::cout<<argc<<std::endl;
+        if (argc != 14) {
             std::cerr << "Error: Incorrect number of arguments for derive_edits." << std::endl;
             print_usage();
             return MSZ_ERR_INVALID_INPUT;
@@ -190,7 +189,7 @@ int main(int argc, char* argv[]) {
         int preserve_min = std::stoi(argv[9]);
         int preserve_max = std::stoi(argv[10]);
         int preserve_path = std::stoi(argv[11]);
-        std::string mode = argv[12];
+        std::string mode = argv[13];
 
 
         int accelerator = (mode == "omp") ? MSZ_ACCELERATOR_OMP :
@@ -238,7 +237,7 @@ int main(int argc, char* argv[]) {
         int width = std::stoi(argv[4]);
         int height = std::stoi(argv[5]);
         int depth = std::stoi(argv[6]);
-        std::string mode = argv[7];
+        std::string mode = argv[8];
 
         int accelerator = (mode == "omp") ? MSZ_ACCELERATOR_OMP :
                           (mode == "cuda") ? MSZ_ACCELERATOR_CUDA : MSZ_ACCELERATOR_NONE;
