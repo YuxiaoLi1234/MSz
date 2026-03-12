@@ -7,6 +7,7 @@
 enum {
     MSZ_PRESERVE_MIN = 0x1,    // Preserve minima
     MSZ_PRESERVE_MAX = 0x2,    // Preserve maxima
+    MSZ_PRESERVE_SADDLE = 0x4, // Preserve saddle points
     MSZ_PRESERVE_PATH = 0x8,   // Preserve separatrices that connecting minima and maxima
 };
 
@@ -70,6 +71,21 @@ enum {
 struct MSz_edit_t {
     uint32_t index; // index where edit is applied
     double offset;  // offset value corresponding to the index
+};
+
+// Enum for critical point types
+enum {
+    MSZ_CRITICAL_MINIMUM = 0,  // Local minimum
+    MSZ_CRITICAL_MAXIMUM = 1,  // Local maximum
+    MSZ_CRITICAL_SADDLE = 2    // Saddle point (for future use)
+};
+
+// Struct for representing critical points
+struct MSz_critical_point_t {
+    uint32_t index;      // Linear index of the critical point in the data array
+    int x, y, z;         // 3D coordinates of the critical point (z=0 for 2D data)
+    double value;        // Function value at the critical point
+    uint8_t type;        // Type of critical point (MSZ_CRITICAL_MINIMUM, MSZ_CRITICAL_MAXIMUM, etc.)
 };
 
 
@@ -153,11 +169,12 @@ struct MSz_edit_t {
   /**
   * @brief API for counting topological distortions in the decompressed data.
   * This function identifies and counts discrepancies between the original data and decompressed data,
-  * including false extrema (minima and maxima) and incorrectly labeled points in the Morse-Smale segmentation.
+  * including false extrema (minima, maxima, and saddle points) and incorrectly labeled points in the Morse-Smale segmentation.
   * @param original_data Pointer to the original data array.
   * @param decompressed_data Pointer to the decompressed data array.
   * @param num_false_min Output parameter to store the number of false minima detected in the decompressed data.
   * @param num_false_max Output parameter to store the number of false maxima detected in the decompressed data.
+  * @param num_false_saddle Output parameter to store the number of false saddle points detected in the decompressed data.
   * @param num_false_labels Output parameter to store the number of incorrectly labeled points in the Morse-Smale segmentation.
   * @param connectivity_type Connectivity type specifier:
   *        - `0`: Piecewise linear connectivity (e.g., in 2D: up, down, left, right, up-right, and bottom-left).
@@ -187,6 +204,7 @@ struct MSz_edit_t {
     *     decompressed_data,               // Input: decompressed dataset
     *     num_false_min,                   // Output: false minima count
     *     num_false_max,                   // Output: false maxima count
+    *     num_false_saddle,                // Output: false saddle points count
     *     num_false_labels,                // Output: mislabeled points count
     *     0,                               // Connectivity type: piecewise linear
     *     100, 100, 100,                   // Dimensions: W, H, D
@@ -199,6 +217,7 @@ struct MSz_edit_t {
     *     std::cout << "Fault counting succeeded." << std::endl;
     *     std::cout << "False minima: " << num_false_min << std::endl;
     *     std::cout << "False maxima: " << num_false_max << std::endl;
+    *     std::cout << "False saddle points: " << num_false_saddle << std::endl;
     *     std::cout << "False labels: " << num_false_labels << std::endl;
     * } else {
     *     std::cerr << "Error in fault counting. Error code: " << status << std::endl;
@@ -412,6 +431,50 @@ struct MSz_edit_t {
   );
 
 
+  /**
+ * @brief API for extracting critical points from input data and optionally computing Morse segmentation.
+ *
+ * This function identifies and extracts all critical points (local minima, maxima, and optionally saddle points)
+ * from the input data. It can also optionally compute the Morse-Smale segmentation, returning the indices of
+ * the destination extrema for every point in the dataset.
+ *
+ * @param data Pointer to the input data array.
+ * @param num_minima Output parameter to store the number of minima found.
+ * @param minima Output parameter to store a pointer to the array of minima critical points.
+ *        The function allocates memory for the array, and the caller is responsible for freeing it.
+ * @param num_maxima Output parameter to store the number of maxima found.
+ * @param maxima Output parameter to store a pointer to the array of maxima critical points.
+ * @param num_saddle_points Output parameter to store the number of saddle points found.
+ * @param saddle_points Output parameter to store a pointer to the array of saddle points.
+ * @param labels Optional output parameter to store the Morse segmentation labels. If provided, the function 
+ *        allocates an array of size 2 * W * H * D. For each point `i`, `labels[2*i]` is the index of its 
+ *        destination minimum and `labels[2*i+1]` is the index of its destination maximum.
+ *        The caller is responsible for freeing this memory.
+ * @param compute_segmentation If true, the function computes the Morse-Smale segmentation labels.
+ * @param connectivity_type Connectivity type specifier (0 for piecewise linear, 1 for full).
+ * @param W, H, D Dimensions of the data grid.
+ * @param accelerator Hardware accelerator for computation.
+ * @param device_id GPU device ID (used only if `accelerator` is `MSZ_ACCELERATOR_CUDA`).
+ * @param num_omp_threads Number of threads (used only if `accelerator` is `MSZ_ACCELERATOR_OMP`).
+ *
+ * @return Returns `MSZ_ERR_NO_ERROR` if the function executes successfully.
+ */
+  int MSz_extract_critical_points( // return MSZ_ERR_NO_ERROR if success
+      const double *data,                    // Input: data array
+      int &num_minima,                       // Output: number of minima
+      MSz_critical_point_t **minima,         // Output: array of minima
+      int &num_maxima,                       // Output: number of maxima
+      MSz_critical_point_t **maxima,         // Output: array of maxima
+      int &num_saddle_points,                // Output: number of saddle points
+      MSz_critical_point_t **saddle_points,  // Output: array of saddle points
+      int **labels,                          // Output: Morse labels (optional)
+      bool compute_segmentation,             // Input: whether to compute segmentation
+      unsigned int connectivity_type,        // Connectivity type specifier
+      int W, int H, int D,                   // Dimensions of the data
+      int accelerator = MSZ_ACCELERATOR_NONE, // Hardware accelerator
+      int device_id = 0,                     // GPU device ID (used if accelerator is CUDA)
+      int num_omp_threads = 1                // Number of threads (used if accelerator is OMP)
+  );
 
 
 #endif // _MSZ_API_H

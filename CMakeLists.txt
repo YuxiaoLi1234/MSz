@@ -19,6 +19,10 @@ add_library(MSz
 configure_file(src/internal/msz_config.h.in ${CMAKE_BINARY_DIR}/include/MSz_config.h)
 target_compile_features(MSz PRIVATE cxx_std_17)
 
+if(UNIX AND NOT APPLE)
+    target_link_options(MSz PUBLIC "-static-libstdc++" "-static-libgcc")
+endif()
+
 target_include_directories(MSz PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>   
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>   
@@ -47,6 +51,10 @@ if (BUILD_EXAMPLES)
     add_executable(ex2 examples/ex2_MSz_derive_apply_edits.cpp)
     target_link_libraries(ex2 PRIVATE MSz Threads::Threads)
     target_compile_features(ex2 PRIVATE cxx_std_17)
+    
+    add_executable(ex3 examples/ex3_MSz_zstd_omp.cpp)
+    target_link_libraries(ex3 PRIVATE MSz Threads::Threads)
+    target_compile_features(ex3 PRIVATE cxx_std_17)
 endif()
 
 # CUDA linkage
@@ -57,6 +65,7 @@ if (MSZ_ENABLE_CUDA)
     target_compile_definitions(MSz PRIVATE MSZ_ENABLE_CUDA=1)
     target_link_libraries(MSz PRIVATE CUDA::cudart)
     set_target_properties(MSz PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+    set_target_properties(MSz PROPERTIES CUDA_ARCHITECTURES "native")
 endif()
 
 # OpenMP linkage
@@ -69,7 +78,15 @@ endif()
 
 if (MSZ_ENABLE_ZSTD)
     find_package(zstd REQUIRED)
-    target_link_libraries(MSz PRIVATE zstd::libzstd)
+    if(TARGET zstd::libzstd)
+        target_link_libraries(MSz PRIVATE zstd::libzstd)
+    elseif(TARGET zstd::libzstd_shared)
+        target_link_libraries(MSz PRIVATE zstd::libzstd_shared)
+    elseif(TARGET zstd::libzstd_static)
+        target_link_libraries(MSz PRIVATE zstd::libzstd_static)
+    else()
+        target_link_libraries(MSz PRIVATE zstd)
+    endif()
 endif()
 
 
@@ -114,3 +131,52 @@ install(FILES
 
 install(TARGETS MSz_CLI
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# Python bindings
+option(BUILD_PYTHON "Build Python bindings" ON)
+if (BUILD_PYTHON)
+    include(FetchContent)
+    FetchContent_Declare(
+      pybind11
+      GIT_REPOSITORY https://github.com/pybind/pybind11.git
+      GIT_TAG        v2.11.1
+    )
+    FetchContent_MakeAvailable(pybind11)
+
+    pybind11_add_module(msz src/python/msz_py.cpp)
+    target_link_libraries(msz PRIVATE MSz)
+    target_include_directories(msz PRIVATE ${CMAKE_BINARY_DIR}/include)
+    
+    if (MSZ_ENABLE_OPENMP)
+        target_compile_definitions(msz PRIVATE MSZ_ENABLE_OPENMP)
+        find_package(OpenMP REQUIRED COMPONENTS CXX)
+        target_link_libraries(msz PRIVATE OpenMP::OpenMP_CXX)
+    endif()
+    if (MSZ_ENABLE_CUDA)
+        target_compile_definitions(msz PRIVATE MSZ_ENABLE_CUDA)
+    endif()
+    if (MSZ_ENABLE_ZSTD)
+        target_compile_definitions(msz PRIVATE MSZ_ENABLE_ZSTD)
+    endif()
+    
+    # Statically link libstdc++ and libgcc to avoid version conflicts in environments like Conda
+    if(UNIX AND NOT APPLE)
+        target_link_options(msz PRIVATE "-static-libstdc++" "-static-libgcc")
+    endif()
+
+    # Set output directory for the python module to the project root or build dir
+    set_target_properties(msz PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
+    # Installation rules for Python module
+    find_package(Python3 COMPONENTS Interpreter Development)
+    if(NOT DEFINED MSZ_PYTHON_INSTALL_DIR)
+        if(Python3_FOUND)
+            set(MSZ_PYTHON_INSTALL_DIR ${Python3_SITELIB})
+        else()
+            set(MSZ_PYTHON_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/python)
+        endif()
+    endif()
+
+    install(TARGETS msz DESTINATION ${MSZ_PYTHON_INSTALL_DIR})
+    message(STATUS "Python module msz will be installed to: ${MSZ_PYTHON_INSTALL_DIR}")
+endif()
